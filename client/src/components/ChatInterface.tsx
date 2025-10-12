@@ -3,7 +3,9 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, Send, User } from 'lucide-react';
+import { Sparkles, Send, User, Loader2 } from 'lucide-react';
+import { useChatWithAI, useParseFoodText, useCreateFoodLog } from '@/lib/hooks';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -17,13 +19,18 @@ export default function ChatInterface() {
     {
       id: '1',
       role: 'assistant',
-      content: 'Olá! Sou o FitMind AI, seu assistente de nutrição e fitness. Como posso ajudar você hoje?',
+      content: 'Olá! Sou o FitMind AI, seu assistente de nutrição e fitness. Você pode adicionar alimentos (ex: "200g de frango") ou fazer perguntas sobre nutrição e treino.',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
   const [input, setInput] = useState('');
+  
+  const { toast } = useToast();
+  const chatMutation = useChatWithAI();
+  const parseFoodMutation = useParseFoodText();
+  const createLogMutation = useCreateFoodLog();
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMessage: Message = {
@@ -33,16 +40,74 @@ export default function ChatInterface() {
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    const aiResponse: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: 'Entendi sua pergunta. Processando com IA...',
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setMessages([...messages, userMessage, aiResponse]);
+    setMessages((prev) => [...prev, userMessage]);
+    const userInput = input;
     setInput('');
+
+    // Check if it's a food input (contains numbers or food-related keywords)
+    const isFoodInput = /\d+\s*(g|ml|kg|unidade|xícara|colher)/i.test(userInput) || 
+                        /comi|comer|almocei|jantei|café|lanche/i.test(userInput);
+
+    if (isFoodInput) {
+      try {
+        const result = await parseFoodMutation.mutateAsync(userInput);
+        
+        if (result && result.length > 0) {
+          // Add foods to log (assuming lunch meal for now)
+          for (const food of result) {
+            await createLogMutation.mutateAsync({
+              foodId: food.id,
+              portion: food.portion || food.servingSize,
+              meal: 'almoço',
+            });
+          }
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Registrei ${result.length} alimento(s): ${result.map((f: any) => f.name).join(', ')}. Total de calorias adicionadas!`,
+            timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+        } else {
+          throw new Error('Não consegui identificar os alimentos');
+        }
+      } catch (error) {
+        toast({
+          title: 'Erro ao processar alimento',
+          description: 'Tente novamente com formato: "200g de frango"',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      // It's a question - use chat AI
+      try {
+        const conversationHistory = messages
+          .filter(m => m.role === 'user' || m.role === 'assistant')
+          .map(m => ({ role: m.role, content: m.content }));
+        
+        conversationHistory.push({ role: 'user', content: userInput });
+
+        const result = await chatMutation.mutateAsync(conversationHistory);
+        
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: result.message,
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      } catch (error) {
+        toast({
+          title: 'Erro na conversa',
+          description: 'Não consegui processar sua mensagem',
+          variant: 'destructive',
+        });
+      }
+    }
   };
+
+  const isLoading = chatMutation.isPending || parseFoodMutation.isPending;
 
   return (
     <div className="flex flex-col h-full">
@@ -69,6 +134,16 @@ export default function ChatInterface() {
               )}
             </div>
           ))}
+          {isLoading && (
+            <div className="flex gap-3 justify-start">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+              </div>
+              <Card className="p-3">
+                <p className="text-sm text-muted-foreground">Pensando...</p>
+              </Card>
+            </div>
+          )}
         </div>
       </ScrollArea>
       <div className="p-4 border-t">
@@ -77,11 +152,12 @@ export default function ChatInterface() {
             placeholder="Digite sua pergunta ou '200g de frango'..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSend()}
+            disabled={isLoading}
             data-testid="input-chat"
           />
-          <Button onClick={handleSend} size="icon" data-testid="button-send-chat">
-            <Send className="h-4 w-4" />
+          <Button onClick={handleSend} size="icon" disabled={isLoading} data-testid="button-send-chat">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </div>

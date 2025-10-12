@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Bell, Plus, Trash2 } from 'lucide-react';
+import { Bell, Plus, Trash2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,48 +12,71 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-
-interface Alarm {
-  id: string;
-  time: string;
-  label: string;
-  enabled: boolean;
-}
+import { useAlarms, useCreateAlarm, useUpdateAlarm, useDeleteAlarm } from '@/lib/hooks';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AlarmList() {
-  const [alarms, setAlarms] = useState<Alarm[]>([
-    { id: '1', time: '07:00', label: 'Café da manhã', enabled: true },
-    { id: '2', time: '18:00', label: 'Hora de ir pra academia', enabled: true },
-  ]);
+  const { data: alarms, isLoading } = useAlarms();
+  const createAlarm = useCreateAlarm();
+  const updateAlarm = useUpdateAlarm();
+  const deleteAlarm = useDeleteAlarm();
+  const { toast } = useToast();
+  
   const [newTime, setNewTime] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [open, setOpen] = useState(false);
 
-  const handleAddAlarm = () => {
+  const handleAddAlarm = async () => {
     if (newTime && newLabel) {
-      setAlarms([
-        ...alarms,
-        {
-          id: Date.now().toString(),
+      try {
+        await createAlarm.mutateAsync({
           time: newTime,
           label: newLabel,
           enabled: true,
-        },
-      ]);
-      setNewTime('');
-      setNewLabel('');
-      setOpen(false);
+        });
+        setNewTime('');
+        setNewLabel('');
+        setOpen(false);
+        toast({
+          title: 'Alarme criado',
+          description: 'Seu alarme foi configurado com sucesso',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro ao criar alarme',
+          description: 'Não foi possível criar o alarme',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
-  const toggleAlarm = (id: string) => {
-    setAlarms(alarms.map(alarm => 
-      alarm.id === id ? { ...alarm, enabled: !alarm.enabled } : alarm
-    ));
+  const toggleAlarm = async (id: string, enabled: boolean) => {
+    try {
+      await updateAlarm.mutateAsync({ id, data: { enabled: !enabled } });
+    } catch (error) {
+      toast({
+        title: 'Erro ao atualizar',
+        description: 'Não foi possível atualizar o alarme',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const deleteAlarm = (id: string) => {
-    setAlarms(alarms.filter(alarm => alarm.id !== id));
+  const handleDeleteAlarm = async (id: string) => {
+    try {
+      await deleteAlarm.mutateAsync(id);
+      toast({
+        title: 'Alarme removido',
+        description: 'O alarme foi excluído com sucesso',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir o alarme',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -95,7 +118,13 @@ export default function AlarmList() {
                   data-testid="input-alarm-label"
                 />
               </div>
-              <Button onClick={handleAddAlarm} className="w-full" data-testid="button-save-alarm">
+              <Button 
+                onClick={handleAddAlarm} 
+                className="w-full" 
+                disabled={createAlarm.isPending}
+                data-testid="button-save-alarm"
+              >
+                {createAlarm.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Salvar Alarme
               </Button>
             </div>
@@ -103,7 +132,11 @@ export default function AlarmList() {
         </Dialog>
       </CardHeader>
       <CardContent className="space-y-3">
-        {alarms.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : !alarms || alarms.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Nenhum alarme configurado
           </p>
@@ -116,7 +149,7 @@ export default function AlarmList() {
               <div className="flex items-center gap-3">
                 <Switch
                   checked={alarm.enabled}
-                  onCheckedChange={() => toggleAlarm(alarm.id)}
+                  onCheckedChange={() => toggleAlarm(alarm.id, alarm.enabled)}
                   data-testid={`switch-alarm-${alarm.id}`}
                 />
                 <div>
@@ -131,10 +164,15 @@ export default function AlarmList() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => deleteAlarm(alarm.id)}
+                onClick={() => handleDeleteAlarm(alarm.id)}
+                disabled={deleteAlarm.isPending}
                 data-testid={`button-delete-alarm-${alarm.id}`}
               >
-                <Trash2 className="h-4 w-4" />
+                {deleteAlarm.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
               </Button>
             </div>
           ))

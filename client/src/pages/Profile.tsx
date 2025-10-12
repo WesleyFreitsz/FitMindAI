@@ -1,23 +1,58 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import WeightProjection from '@/components/WeightProjection';
-import { Calculator, Save, Target, TrendingDown, Scale } from 'lucide-react';
+import { Calculator, Save, Target, TrendingDown, Scale, Loader2 } from 'lucide-react';
+import { useUser, useUpdateUser } from '@/lib/hooks';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Profile() {
-  //todo: remove mock functionality
+  const { data: user, isLoading } = useUser();
+  const updateUser = useUpdateUser();
+  const { toast } = useToast();
+  
   const [formData, setFormData] = useState({
-    name: 'João Silva',
-    age: 28,
-    sex: 'masculino',
-    weight: 78.5,
-    height: 175,
-    goal: 'perder',
-    activityLevel: 'moderado',
+    name: '',
+    age: 0,
+    sex: '',
+    weight: 0,
+    height: 0,
+    goal: '',
+    activityLevel: '',
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name,
+        age: user.age,
+        sex: user.sex,
+        weight: user.weight,
+        height: user.height,
+        goal: user.goal,
+        activityLevel: user.activityLevel,
+      });
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    try {
+      await updateUser.mutateAsync(formData);
+      toast({
+        title: 'Perfil atualizado',
+        description: 'Suas informações foram salvas com sucesso',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível atualizar seu perfil',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const calculateBMR = () => {
     const { weight, height, age, sex } = formData;
@@ -48,14 +83,22 @@ export default function Profile() {
   };
 
   const mockWeightData = [
-    { day: 'Seg', weight: 78.5 },
-    { day: 'Ter', weight: 78.2 },
-    { day: 'Qua', weight: 78.0 },
-    { day: 'Qui', weight: 77.8 },
-    { day: 'Sex', weight: 77.5 },
-    { day: 'Sáb', weight: 77.3 },
-    { day: 'Dom', weight: 77.0 },
+    { day: 'Seg', weight: formData.weight },
+    { day: 'Ter', weight: formData.weight - 0.3 },
+    { day: 'Qua', weight: formData.weight - 0.5 },
+    { day: 'Qui', weight: formData.weight - 0.7 },
+    { day: 'Sex', weight: formData.weight - 1 },
+    { day: 'Sáb', weight: formData.weight - 1.2 },
+    { day: 'Dom', weight: formData.weight - 1.5 },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -81,7 +124,7 @@ export default function Profile() {
                   type="number"
                   step="0.1"
                   value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
                   data-testid="input-weight"
                 />
               </div>
@@ -92,7 +135,7 @@ export default function Profile() {
                   id="height"
                   type="number"
                   value={formData.height}
-                  onChange={(e) => setFormData({ ...formData, height: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, height: parseInt(e.target.value) || 0 })}
                   data-testid="input-height"
                 />
               </div>
@@ -105,7 +148,7 @@ export default function Profile() {
                   id="age"
                   type="number"
                   value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || 0 })}
                   data-testid="input-age"
                 />
               </div>
@@ -164,8 +207,17 @@ export default function Profile() {
               </Select>
             </div>
 
-            <Button onClick={() => console.log('Saving profile')} className="w-full" data-testid="button-save-profile">
-              <Save className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={handleSave} 
+              className="w-full" 
+              disabled={updateUser.isPending}
+              data-testid="button-save-profile"
+            >
+              {updateUser.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
               Salvar Alterações
             </Button>
           </CardContent>
@@ -208,7 +260,7 @@ export default function Profile() {
 
       <WeightProjection
         currentWeight={formData.weight}
-        projectedWeight={77.0}
+        projectedWeight={formData.weight - 1.5}
         weeklyData={mockWeightData}
       />
 
