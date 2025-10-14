@@ -83,10 +83,10 @@ export function useCreateFoodLog() {
     },
     onSuccess: (data) => {
       if (data) {
-        // CORREÇÃO: Invalidar a query com a chave exata, incluindo a data de hoje.
-        const dateStr = new Date().toISOString().split("T")[0];
         queryClient.invalidateQueries({
-          queryKey: ["/api/food-logs", dateStr],
+          predicate: (query) => 
+            query.queryKey[0] === "/api/food-logs" || 
+            query.queryKey[0] === "/api/food-logs/range"
         });
       }
     },
@@ -107,10 +107,10 @@ export function useDeleteFoodLog() {
     },
     onSuccess: (data) => {
       if (data) {
-        // CORREÇÃO: Aplicada aqui também para consistência.
-        const dateStr = new Date().toISOString().split("T")[0];
         queryClient.invalidateQueries({
-          queryKey: ["/api/food-logs", dateStr],
+          predicate: (query) => 
+            query.queryKey[0] === "/api/food-logs" || 
+            query.queryKey[0] === "/api/food-logs/range"
         });
       }
     },
@@ -148,7 +148,11 @@ export function useCreateExercise() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: ["/api/exercises"] });
+        queryClient.invalidateQueries({
+          predicate: (query) => 
+            query.queryKey[0] === "/api/exercises" || 
+            query.queryKey[0] === "/api/exercises/range"
+        });
       }
     },
   });

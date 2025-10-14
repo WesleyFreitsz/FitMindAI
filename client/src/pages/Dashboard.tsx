@@ -207,7 +207,6 @@ export default function Dashboard() {
               exercises.map((workout) => (
                 <WorkoutCard
                   key={workout.id}
-                  id={workout.id}
                   type={workout.type}
                   duration={workout.duration}
                   intensity={workout.intensity}
