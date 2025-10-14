@@ -1,15 +1,21 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ChatInterface from '@/components/ChatInterface';
-import CalorieRing from '@/components/CalorieRing';
-import MacroBar from '@/components/MacroBar';
-import MealSummary from '@/components/MealSummary';
-import { useFoodLogs, useUser, useExercises } from '@/lib/hooks';
-import { Activity, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ChatInterface from "@/components/ChatInterface";
+import CalorieRing from "@/components/CalorieRing";
+import MacroBar from "@/components/MacroBar";
+import MealSummary from "@/components/MealSummary";
+import {
+  useFoodLogs,
+  useUser,
+  useExercises,
+  useDeleteFoodLog,
+} from "@/lib/hooks";
+import { Activity, Loader2 } from "lucide-react";
 
 export default function Chat() {
   const { data: user, isLoading: userLoading } = useUser();
   const { data: foodLogs, isLoading: logsLoading } = useFoodLogs();
   const { data: exercises, isLoading: exercisesLoading } = useExercises();
+  const deleteFoodLogMutation = useDeleteFoodLog();
 
   if (userLoading || logsLoading || exercisesLoading) {
     return (
@@ -19,11 +25,14 @@ export default function Chat() {
     );
   }
 
-  // Calculate BMR and TDEE
+  const handleDeleteLog = (id: string) => {
+    deleteFoodLogMutation.mutate(id);
+  };
+
   const calculateBMR = () => {
     if (!user) return 0;
     const { weight, height, age, sex } = user;
-    if (sex === 'masculino') {
+    if (sex === "masculino") {
       return 10 * weight + 6.25 * height - 5 * age + 5;
     } else {
       return 10 * weight + 6.25 * height - 5 * age - 161;
@@ -39,10 +48,15 @@ export default function Chat() {
   };
 
   const bmr = calculateBMR();
-  const tdee = bmr * (user ? activityMultipliers[user.activityLevel] || 1.55 : 1.55);
-  const calorieGoal = user?.goal === 'ganhar' ? tdee + 300 : user?.goal === 'perder' ? tdee - 500 : tdee;
+  const tdee =
+    bmr * (user ? activityMultipliers[user.activityLevel] || 1.55 : 1.55);
+  const calorieGoal =
+    user?.goal === "ganhar"
+      ? tdee + 300
+      : user?.goal === "perder"
+      ? tdee - 500
+      : tdee;
 
-  // Calculate totals from food logs
   const foodTotals = (foodLogs || []).reduce(
     (acc, log) => {
       if (log.food) {
@@ -59,23 +73,13 @@ export default function Chat() {
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
-  // Calculate calories burned from exercises
-  const exerciseCalories = (exercises || []).reduce((acc, ex) => acc + ex.caloriesBurned, 0);
+  const exerciseCalories = (exercises || []).reduce(
+    (acc, ex) => acc + ex.caloriesBurned,
+    0
+  );
 
-  // Group foods by meal
-  const groupByMeal = (meal: string) => {
-    return (foodLogs || [])
-      .filter(log => log.meal === meal && log.food)
-      .map(log => {
-        const multiplier = log.portion / (log.food?.servingSize || 1);
-        return {
-          name: log.food!.name,
-          calories: log.food!.calories * multiplier,
-          protein: log.food!.protein * multiplier,
-          carbs: log.food!.carbs * multiplier,
-          fat: log.food!.fat * multiplier,
-        };
-      });
+  const groupLogsByMeal = (meal: string) => {
+    return (foodLogs || []).filter((log) => log.meal === meal && log.food);
   };
 
   const proteinGoal = Math.round(user?.weight ? user.weight * 2 : 150);
@@ -135,11 +139,29 @@ export default function Chat() {
         </Card>
 
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">Refeições de Hoje</h3>
-          <MealSummary meal="cafe" foods={groupByMeal('café')} />
-          <MealSummary meal="almoco" foods={groupByMeal('almoço')} />
-          <MealSummary meal="jantar" foods={groupByMeal('jantar')} />
-          <MealSummary meal="lanches" foods={groupByMeal('lanches')} />
+          <h3 className="text-sm font-semibold text-foreground">
+            Refeições de Hoje
+          </h3>
+          <MealSummary
+            meal="cafe"
+            logs={groupLogsByMeal("café")}
+            onDeleteLog={handleDeleteLog}
+          />
+          <MealSummary
+            meal="almoco"
+            logs={groupLogsByMeal("almoço")}
+            onDeleteLog={handleDeleteLog}
+          />
+          <MealSummary
+            meal="jantar"
+            logs={groupLogsByMeal("jantar")}
+            onDeleteLog={handleDeleteLog}
+          />
+          <MealSummary
+            meal="lanches"
+            logs={groupLogsByMeal("lanches")}
+            onDeleteLog={handleDeleteLog}
+          />
         </div>
       </div>
     </div>

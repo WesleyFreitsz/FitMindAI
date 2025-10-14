@@ -1,12 +1,22 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  real,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  password: text("password").notNull(),
   age: integer("age").notNull(),
   sex: text("sex").notNull(),
   weight: real("weight").notNull(),
@@ -16,7 +26,9 @@ export const users = pgTable("users", {
 });
 
 export const foods = pgTable("foods", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   calories: real("calories").notNull(),
   protein: real("protein").notNull(),
@@ -27,7 +39,9 @@ export const foods = pgTable("foods", {
 });
 
 export const foodLogs = pgTable("food_logs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   foodId: varchar("food_id").notNull(),
   portion: real("portion").notNull(),
@@ -36,7 +50,9 @@ export const foodLogs = pgTable("food_logs", {
 });
 
 export const exercises = pgTable("exercises", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   type: text("type").notNull(),
   duration: integer("duration").notNull(),
@@ -47,12 +63,19 @@ export const exercises = pgTable("exercises", {
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFoodSchema = createInsertSchema(foods).omit({ id: true });
-export const insertFoodLogSchema = createInsertSchema(foodLogs).omit({ id: true, timestamp: true });
-export const insertExerciseSchema = createInsertSchema(exercises).omit({ id: true, timestamp: true });
+export const insertFoodLogSchema = createInsertSchema(foodLogs).omit({
+  id: true,
+  timestamp: true,
+});
+export const insertExerciseSchema = createInsertSchema(exercises).omit({
+  id: true,
+  timestamp: true,
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Food = typeof foods.$inferSelect;
+export type InsertFood = z.infer<typeof insertFoodSchema>;
 export type FoodLog = typeof foodLogs.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type InsertFoodLog = z.infer<typeof insertFoodLogSchema>;

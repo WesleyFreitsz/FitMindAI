@@ -1,38 +1,29 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Coffee, Sun, Moon, Cookie } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Trash2, Coffee, Sun, Moon, Cookie } from "lucide-react";
+import type { Food, FoodLog } from "@shared/schema";
 
 interface MealSummaryProps {
-  meal: 'cafe' | 'almoco' | 'jantar' | 'lanches';
-  foods: Array<{
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-  }>;
+  meal: "cafe" | "almoco" | "jantar" | "lanches";
+  logs: (FoodLog & { food?: Food })[];
+  onDeleteLog: (logId: string) => void;
 }
 
 const mealConfig = {
-  cafe: { label: 'Café da Manhã', icon: Coffee },
-  almoco: { label: 'Almoço', icon: Sun },
-  jantar: { label: 'Jantar', icon: Moon },
-  lanches: { label: 'Lanches', icon: Cookie },
+  cafe: { label: "Café da Manhã", icon: Coffee },
+  almoco: { label: "Almoço", icon: Sun },
+  jantar: { label: "Jantar", icon: Moon },
+  lanches: { label: "Lanches", icon: Cookie },
 };
 
-export default function MealSummary({ meal, foods }: MealSummaryProps) {
+export default function MealSummary({
+  meal,
+  logs,
+  onDeleteLog,
+}: MealSummaryProps) {
   const config = mealConfig[meal];
   const Icon = config.icon;
-
-  const totals = foods.reduce(
-    (acc, food) => ({
-      calories: acc.calories + food.calories,
-      protein: acc.protein + food.protein,
-      carbs: acc.carbs + food.carbs,
-      fat: acc.fat + food.fat,
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
 
   return (
     <Card>
@@ -43,30 +34,49 @@ export default function MealSummary({ meal, foods }: MealSummaryProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {foods.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum alimento registrado</p>
+        {logs.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-2">
+            Nenhum alimento registrado
+          </p>
         ) : (
-          <>
-            {foods.map((food, index) => (
-              <div key={index} className="text-sm text-foreground">
-                {food.name}
+          logs.map((log) => {
+            if (!log.food) return null;
+            const multiplier = log.portion / log.food.servingSize;
+            const calories = log.food.calories * multiplier;
+            const protein = log.food.protein * multiplier;
+            const carbs = log.food.carbs * multiplier;
+            const fat = log.food.fat * multiplier;
+
+            return (
+              <div
+                key={log.id}
+                className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {log.food.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {log.portion}
+                    {log.food.servingUnit}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {calories.toFixed(0)} kcal
+                  </Badge>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => onDeleteLog(log.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            ))}
-            <div className="flex flex-wrap gap-2 pt-2 border-t">
-              <Badge variant="secondary" className="text-xs">
-                {totals.calories} kcal
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                P: {totals.protein}g
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                C: {totals.carbs}g
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                G: {totals.fat}g
-              </Badge>
-            </div>
-          </>
+            );
+          })
         )}
       </CardContent>
     </Card>
