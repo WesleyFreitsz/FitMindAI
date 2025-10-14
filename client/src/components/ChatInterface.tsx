@@ -130,7 +130,7 @@ export default function ChatInterface() {
   };
 
   const handleMealSelect = async (
-    meal: "café" | "almoço" | "jantar" | "lanches"
+    meal: "cafe" | "almoco" | "jantar" | "lanches"
   ) => {
     if (pendingFoods.length === 0) return;
 
@@ -218,14 +218,14 @@ export default function ChatInterface() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleMealSelect("café")}
+                      onClick={() => handleMealSelect("cafe")}
                     >
                       <Coffee className="h-4 w-4 mr-1" /> Café
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleMealSelect("almoço")}
+                      onClick={() => handleMealSelect("almoco")}
                     >
                       <Sun className="h-4 w-4 mr-1" /> Almoço
                     </Button>

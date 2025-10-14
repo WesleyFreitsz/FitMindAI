@@ -83,11 +83,9 @@ export function useCreateFoodLog() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({
-          predicate: (query) => 
-            query.queryKey[0] === "/api/food-logs" || 
-            query.queryKey[0] === "/api/food-logs/range"
-        });
+        // Invalida TODAS as queries que começam com '/api/food-logs'
+        // Isso inclui o resumo diário e o calendário/progresso
+        queryClient.invalidateQueries({ queryKey: ["/api/food-logs"] });
       }
     },
   });
@@ -107,11 +105,8 @@ export function useDeleteFoodLog() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({
-          predicate: (query) => 
-            query.queryKey[0] === "/api/food-logs" || 
-            query.queryKey[0] === "/api/food-logs/range"
-        });
+        // Invalida TODAS as queries que começam com '/api/food-logs'
+        queryClient.invalidateQueries({ queryKey: ["/api/food-logs"] });
       }
     },
   });
@@ -148,11 +143,7 @@ export function useCreateExercise() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({
-          predicate: (query) => 
-            query.queryKey[0] === "/api/exercises" || 
-            query.queryKey[0] === "/api/exercises/range"
-        });
+        queryClient.invalidateQueries({ queryKey: ["/api/exercises"] });
       }
     },
   });
@@ -258,7 +249,10 @@ export function useFoodLogsRange(startDate: Date, endDate: Date) {
     queryKey: ["/api/food-logs/range", startStr, endStr],
     enabled: !user?.isGuest,
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/food-logs/range?start=${startStr}&end=${endStr}`);
+      const res = await apiRequest(
+        "GET",
+        `/api/food-logs/range?start=${startStr}&end=${endStr}`
+      );
       return res.json();
     },
   });
@@ -273,7 +267,10 @@ export function useExercisesRange(startDate: Date, endDate: Date) {
     queryKey: ["/api/exercises/range", startStr, endStr],
     enabled: !user?.isGuest,
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/exercises/range?start=${startStr}&end=${endStr}`);
+      const res = await apiRequest(
+        "GET",
+        `/api/exercises/range?start=${startStr}&end=${endStr}`
+      );
       return res.json();
     },
   });

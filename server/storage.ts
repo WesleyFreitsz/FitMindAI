@@ -6,8 +6,15 @@ import {
   type InsertFoodLog,
   type Exercise,
   type InsertExercise,
+  users,
+  foods,
+  foodLogs,
+  exercises,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 
 export interface Alarm {
   id: string;
@@ -23,8 +30,8 @@ export type SafeUser = Omit<User, "password">;
 export interface IStorage {
   // Métodos de Usuário
   getUser(id: string): Promise<SafeUser | undefined>;
-  getUserById(id: string): Promise<User | undefined>; // Retorna usuário completo para auth
-  getUserByEmail(email: string): Promise<User | undefined>; // Interno, retorna com senha
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(
     id: string,
@@ -57,137 +64,157 @@ export interface IStorage {
   deleteAlarm(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User> = new Map();
-  private foods: Map<string, Food> = new Map();
-  private foodLogs: Map<string, FoodLog> = new Map();
-  private exercises: Map<string, Exercise> = new Map();
-  private alarms: Map<string, Alarm> = new Map();
+class DrizzleStorage implements IStorage {
+  private db;
 
   constructor() {
-    // A base de dados de alimentos pré-cadastrados foi removida.
+    const client = postgres(process.env.DATABASE_URL!);
+    this.db = drizzle(client);
   }
 
   // --- Métodos de Usuário ---
   async getUser(id: string): Promise<SafeUser | undefined> {
-    const user = this.users.get(id);
-    if (user) {
-      const { password, ...userWithoutPassword } = user;
+    const user = await this.db.select().from(users).where(eq(users.id, id));
+    if (user.length > 0) {
+      const { password, ...userWithoutPassword } = user[0];
       return userWithoutPassword;
     }
     return undefined;
   }
 
   async getUserById(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const user = await this.db.select().from(users).where(eq(users.id, id));
+    return user[0];
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find((user) => user.email === email);
+    const user = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+    return user[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const newUser = await this.db.insert(users).values(insertUser).returning();
+    return newUser[0];
   }
 
   async updateUser(
     id: string,
     data: Partial<InsertUser>
   ): Promise<SafeUser | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    const updatedUser = { ...user, ...data };
-    this.users.set(id, updatedUser);
-    const { password, ...safeUser } = updatedUser;
-    return safeUser;
+    const updatedUser = await this.db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+    if (updatedUser.length > 0) {
+      const { password, ...safeUser } = updatedUser[0];
+      return safeUser;
+    }
+    return undefined;
   }
-
   // --- Métodos de Alimentos ---
   async getFoods(): Promise<Food[]> {
-    return Array.from(this.foods.values());
+    return this.db.select().from(foods);
   }
 
   async getFoodById(id: string): Promise<Food | undefined> {
-    return this.foods.get(id);
+    const food = await this.db.select().from(foods).where(eq(foods.id, id));
+    return food[0];
   }
 
   async searchFoods(query: string): Promise<Food[]> {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.foods.values()).filter(
-      (food) =>
-        food && food.name && food.name.toLowerCase().includes(lowerQuery)
-    );
+    return this.db
+      .select()
+      .from(foods)
+      .where(sql`LOWER(${foods.name}) LIKE ${"%" + query.toLowerCase() + "%"}`);
   }
 
   async createFood(food: Omit<Food, "id">): Promise<Food> {
-    const id = randomUUID();
-    const newFood: Food = { ...food, id };
-    this.foods.set(id, newFood);
-    return newFood;
+    const newFood = await this.db.insert(foods).values(food).returning();
+    return newFood[0];
   }
 
   // --- Métodos de Log de Alimentos ---
   async getFoodLogs(userId: string, date?: Date): Promise<FoodLog[]> {
-    const logs = Array.from(this.foodLogs.values()).filter(
-      (log) => log.userId === userId
-    );
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-      return logs.filter((log) => {
-        const logDate = new Date(log.timestamp);
-        return logDate >= startOfDay && logDate <= endOfDay;
-      });
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth();
+      const day = date.getUTCDate();
+      const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+      const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
+      return this.db
+        .select()
+        .from(foodLogs)
+        .where(
+          and(
+            eq(foodLogs.userId, userId),
+            gte(foodLogs.timestamp, startOfDay),
+            lte(foodLogs.timestamp, endOfDay)
+          )
+        );
     }
-    return logs;
+    return this.db.select().from(foodLogs).where(eq(foodLogs.userId, userId));
   }
 
   async createFoodLog(log: InsertFoodLog): Promise<FoodLog> {
-    const id = randomUUID();
-    const newLog: FoodLog = { ...log, id, timestamp: new Date() };
-    this.foodLogs.set(id, newLog);
-    return newLog;
+    const newLog = await this.db.insert(foodLogs).values(log).returning();
+    return newLog[0];
   }
 
   async deleteFoodLog(id: string): Promise<boolean> {
-    return this.foodLogs.delete(id);
+    const result = await this.db
+      .delete(foodLogs)
+      .where(eq(foodLogs.id, id))
+      .returning({ id: foodLogs.id });
+    return result.length > 0;
   }
 
   // --- Métodos de Exercícios ---
   async getExercises(userId: string, date?: Date): Promise<Exercise[]> {
-    const exercises = Array.from(this.exercises.values()).filter(
-      (ex) => ex.userId === userId
-    );
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-      return exercises.filter((ex) => {
-        const exDate = new Date(ex.timestamp);
-        return exDate >= startOfDay && exDate <= endOfDay;
-      });
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth();
+      const day = date.getUTCDate();
+      const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+      const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
+      return this.db
+        .select()
+        .from(exercises)
+        .where(
+          and(
+            eq(exercises.userId, userId),
+            gte(exercises.timestamp, startOfDay),
+            lte(exercises.timestamp, endOfDay)
+          )
+        );
     }
-    return exercises;
+    return this.db.select().from(exercises).where(eq(exercises.userId, userId));
   }
 
   async createExercise(exercise: InsertExercise): Promise<Exercise> {
-    const id = randomUUID();
-    const newExercise: Exercise = { ...exercise, id, timestamp: new Date() };
-    this.exercises.set(id, newExercise);
-    return newExercise;
+    const newExercise = await this.db
+      .insert(exercises)
+      .values(exercise)
+      .returning();
+    return newExercise[0];
   }
 
   async deleteExercise(id: string): Promise<boolean> {
-    return this.exercises.delete(id);
+    const result = await this.db
+      .delete(exercises)
+      .where(eq(exercises.id, id))
+      .returning({ id: exercises.id });
+    return result.length > 0;
   }
 
   // --- Métodos de Alarmes ---
+  private alarms: Map<string, Alarm> = new Map();
+
   async getAlarms(userId: string): Promise<Alarm[]> {
     return Array.from(this.alarms.values()).filter(
       (alarm) => alarm.userId === userId
@@ -217,4 +244,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DrizzleStorage();

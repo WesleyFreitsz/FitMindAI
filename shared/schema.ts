@@ -6,9 +6,18 @@ import {
   integer,
   real,
   timestamp,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Enum para tipo de refeição
+export const mealEnum = pgEnum("meal_type", [
+  "cafe",
+  "almoco",
+  "jantar",
+  "lanches",
+]);
 
 export const users = pgTable("users", {
   id: varchar("id")
@@ -45,7 +54,7 @@ export const foodLogs = pgTable("food_logs", {
   userId: varchar("user_id").notNull(),
   foodId: varchar("food_id").notNull(),
   portion: real("portion").notNull(),
-  meal: text("meal").notNull(),
+  meal: mealEnum("meal").notNull(), // ✅ enum padronizado
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
