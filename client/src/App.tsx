@@ -39,7 +39,6 @@ function MainLayout() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-background">
-      {/* Header */}
       <header className="flex items-center justify-between p-4 border-b bg-background sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />
@@ -66,12 +65,10 @@ function MainLayout() {
         </div>
       </header>
 
-      {/* Conteúdo */}
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <ActiveComponent />
       </main>
 
-      {/* Navegação inferior */}
       <nav className="border-t bg-background sticky bottom-0 z-10">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
           {Object.entries({
@@ -129,7 +126,6 @@ function AppRoutes() {
       <Route path="/register">
         {!user?.isGuest ? <Redirect to="/" /> : <RegisterPage />}
       </Route>
-      {/* Todas as outras rotas renderizam o layout principal */}
       <Route>
         <MainLayout />
       </Route>

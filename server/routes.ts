@@ -12,15 +12,12 @@ import bcrypt from "bcrypt";
 import { User as AppUser, Food, FoodLog } from "../shared/schema.js";
 import { z } from "zod";
 
-// Estende a interface global do Express para que o req.user seja tipado corretamente
 declare global {
   namespace Express {
-    // eslint-disable-next-line @typescript-eslint/no-empty-interface
     interface User extends AppUser {}
   }
 }
 
-// Middleware para garantir que o usuário está autenticado
 function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (req.isAuthenticated()) {
     return next();
@@ -32,7 +29,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const authRouter = express.Router();
   const apiRouter = express.Router();
 
-  // --- ROTAS DE AUTENTICAÇÃO (Públicas) ---
   authRouter.post("/register", async (req, res, next) => {
     try {
       const schema = z.object({
@@ -98,15 +94,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   authRouter.get("/me", (req: Request, res: Response) => {
     if (req.isAuthenticated()) {
-      // Remove a senha antes de enviar a resposta
       const { password, ...safeUser } = req.user as AppUser;
       res.json(safeUser);
     } else {
-      res.status(401).json(null); // Resposta esperada para usuário não logado
+      res.status(401).json(null); 
     }
   });
 
-  // --- ROTAS DE API (Protegidas e Públicas) ---
 
   apiRouter.get("/user", ensureAuthenticated, (req: Request, res: Response) => {
     const { password, ...safeUser } = req.user as AppUser;
@@ -136,7 +130,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.isAuthenticated()) {
       user = req.user as AppUser;
     } else {
-      // Cria um objeto de usuário convidado padrão para o contexto da IA
       user = {
         id: "guest",
         name: "Convidado",
@@ -157,15 +150,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (parsed.type === "food" && parsed.foods) {
       const detailedFoods = await Promise.all(
         parsed.foods.map(async (food) => {
-          // Sempre estima com a IA
           return estimateFoodNutrition(food.name, food.portion, food.unit);
         })
       );
-      // Retorna uma lista de comidas com todos os nutrientes calculados pela IA
       return res.json(detailedFoods.filter(Boolean));
     }
 
-    // Retorna o resultado do parse se não for 'food' (ex: 'workout' ou 'question')
     res.json(parsed);
   });
 
@@ -198,9 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let finalFoodId = foodId;
 
-      // Se não houver ID, mas houver dados, cria um novo alimento
       if (!finalFoodId && foodData) {
-        // Normaliza os dados da IA para uma porção de 100g antes de salvar
         const multiplier = 100 / (foodData.portion || 100);
         const normalizedFood = {
           name: foodData.name,
@@ -321,7 +309,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // --- ROTAS DE ALARME ---
   apiRouter.get(
     "/alarms",
     ensureAuthenticated,
@@ -376,7 +363,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.isAuthenticated()) {
       user = req.user as AppUser;
     } else {
-      // Cria um objeto de usuário convidado padrão para o contexto da IA
       user = {
         id: "guest",
         name: "Convidado",
@@ -395,7 +381,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: response });
   });
 
-  // Monta os routers nos caminhos corretos
   app.use("/api/auth", authRouter);
   app.use("/api", apiRouter);
 

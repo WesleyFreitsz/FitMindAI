@@ -66,19 +66,16 @@ export default function AlarmList() {
   );
   const lastCheckedMinute = useRef<string | null>(null);
 
-  // --- Lógica de Alarme Principal ---
   const [play, { stop, sound }] = useSound(activeAlarm?.sound || "", {
     loop: true,
   });
 
-  // --- Lógica de Pré-visualização ---
   const [previewSound, setPreviewSound] = useState<string | null>(null);
   const [playPreview, { stop: stopPreview }] = useSound(previewSound || "", {
     interrupt: true,
     onend: () => setPreviewSound(null),
   });
 
-  // Garante que o AudioContext seja iniciado por uma interação do usuário
   useEffect(() => {
     const unlockAudio = () => {
       if (sound && sound.ctx.state === "suspended") {
@@ -118,7 +115,6 @@ export default function AlarmList() {
     setActiveAlarm(null);
   }, [stop]);
 
-  // Lógica de verificação de alarme
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
@@ -137,7 +133,7 @@ export default function AlarmList() {
           alarm.enabled &&
           alarm.time === currentTime &&
           !activeAlarm &&
-          !triggeredAlarms.has(alarm.id) // <<-- Correção do Loop Infinito
+          !triggeredAlarms.has(alarm.id) 
         ) {
           setActiveAlarm(alarm);
           setTriggeredAlarms((prev) => new Set(prev).add(alarm.id));

@@ -12,7 +12,6 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Enum para tipo de refeição
 export const mealEnum = pgEnum("meal_type", [
   "cafe",
   "almoco",

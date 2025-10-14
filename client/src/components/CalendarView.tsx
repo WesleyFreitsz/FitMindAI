@@ -59,7 +59,7 @@ export default function CalendarView() {
       currentMonth.getMonth(),
       day
     );
-    setModalDate(selectedDate); // Abre o modal com a data selecionada
+    setModalDate(selectedDate); 
   };
 
   const monthNames = [

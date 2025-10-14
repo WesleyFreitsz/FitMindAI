@@ -9,7 +9,6 @@ import { User, InsertUser } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 
-// Adicionamos uma propriedade opcional 'isGuest' ao tipo User
 type AppUser = User & { isGuest?: boolean };
 
 interface AuthContextType {
@@ -23,19 +22,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Objeto padrão para o usuário convidado
 const GUEST_USER: AppUser = {
   id: "guest",
   name: "Convidado",
   email: "",
-  password: "", // A senha não é usada, mas precisa existir para satisfazer o tipo
+  password: "", 
   age: 25,
   sex: "masculino",
   weight: 70,
   height: 175,
   goal: "manter",
   activityLevel: "moderado",
-  isGuest: true, // Flag para identificar o usuário convidado
+  isGuest: true, 
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -56,15 +54,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userData = await res.json();
           setUser({ ...userData, isGuest: false });
         } else if (res.status === 401) {
-          // ✅ Sessão inexistente → usuário convidado
           setUser(GUEST_USER);
         } else {
-          // ❗ Outros erros de status
           console.warn("Erro inesperado no /api/auth/me:", res.status);
           setUser(GUEST_USER);
         }
       } catch (error) {
-        // 🔹 Falha real (servidor offline, CORS, etc)
         console.warn("Falha ao verificar sessão:", error);
         setUser(GUEST_USER);
       } finally {
@@ -99,7 +94,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Falha ao fazer logout:", error);
     } finally {
-      // Força um recarregamento completo da página, que irá resetar todo o estado.
       window.location.href = "/";
     }
   };

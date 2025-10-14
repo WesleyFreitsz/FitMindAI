@@ -4,7 +4,6 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { User } from "../shared/schema.js";
-// Pega a chave do ambiente que configuramos
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 if (!apiKey) {
   console.warn("GEMINI_API_KEY is not set - AI features will be disabled");
@@ -12,7 +11,6 @@ if (!apiKey) {
 
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-// Configurações do modelo para garantir a saída em JSON
 const generationConfig = {
   temperature: 0.7,
   topP: 1,
@@ -46,7 +44,6 @@ const model = genAI?.getGenerativeModel({
   safetySettings,
 });
 
-// Tipos de dados para clareza
 interface ParsedFood {
   name: string;
   portion: number;
@@ -67,7 +64,7 @@ interface ParsedWorkout {
   type: "food" | "workout" | "question";
   workouts?: {
     name: string;
-    duration: number; // em minutos
+    duration: number; 
     intensity: "leve" | "moderado" | "intenso";
     caloriesBurned: number;
   }[];
@@ -165,15 +162,13 @@ export async function chatWithAI(
     return "AI features are disabled. Please configure GEMINI_API_KEY.";
   }
 
-  const chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Modelo para chat, sem modo JSON forçado
+  const chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
 
-  // Converte o histórico de mensagens para o formato do Gemini
   let history = messages.slice(0, -1).map((msg) => ({
     role: msg.role === "assistant" ? "model" : "user",
     parts: [{ text: msg.content }],
   }));
 
-  // Garante que o histórico sempre comece com uma mensagem do usuário
   const firstUserMessageIndex = history.findIndex((msg) => msg.role === "user");
   if (firstUserMessageIndex > -1) {
     history = history.slice(firstUserMessageIndex);

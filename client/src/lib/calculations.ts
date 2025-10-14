@@ -1,6 +1,5 @@
 import type { User, FoodLog, Exercise } from "@shared/schema";
 
-// Tipo para os dados necessários para os cálculos, compatível com User e formData
 type UserDataForCalculations = Pick<
   User,
   "weight" | "height" | "age" | "sex" | "activityLevel" | "goal"
@@ -100,8 +99,8 @@ export function calculateDailyStats(
       servingSize: number;
     };
     portion: number;
-  }> = [], // Adicionado valor padrão
-  exercises: Array<{ caloriesBurned: number }> = [] // Adicionado valor padrão
+  }> = [], 
+  exercises: Array<{ caloriesBurned: number }> = [] 
 ) {
   const totals = logs.reduce(
     (acc, log) => {

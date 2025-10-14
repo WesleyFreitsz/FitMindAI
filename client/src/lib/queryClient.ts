@@ -1,8 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Função que verifica se a resposta é um erro (diferente de 401)
 async function throwIfResNotOk(res: Response) {
-  // Não lança erro para 401, pois é um estado esperado (usuário não logado)
   if (!res.ok && res.status !== 401) {
     const text = (await res.text()) || res.statusText;
     throw new Error(`Request failed with status ${res.status}: ${text}`);
@@ -25,13 +23,11 @@ export async function apiRequest(
   return res;
 }
 
-// A função de query padrão para o React Query
 const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
   const res = await fetch(queryKey.join("/") as string, {
     credentials: "include",
   });
 
-  // Se não estiver autorizado (convidado), retorna null em vez de lançar um erro
   if (res.status === 401) {
     return null;
   }
@@ -43,7 +39,7 @@ const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: defaultQueryFn, // Usamos a nova função padrão
+      queryFn: defaultQueryFn, 
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,

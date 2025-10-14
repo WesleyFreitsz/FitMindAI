@@ -15,12 +15,11 @@ const pgPool = new pg.Pool({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// --- CONFIGURAÇÃO DE SESSÃO COM POSTGRES ---
 app.use(
   session({
     store: new PgStore({
       pool: pgPool,
-      tableName: "user_sessions", // Nome da tabela para guardar as sessões
+      tableName: "user_sessions", 
       createTableIfMissing: true,
     }),
     secret:
@@ -34,12 +33,10 @@ app.use(
   })
 );
 
-// --- INICIALIZAÇÃO DO PASSPORT ---
 app.use(passport.initialize());
 app.use(passport.session());
 
 (async () => {
-  // Logger dinâmico
   const { log } = await import("./vite.js").catch(() => ({ log: console.log }));
   app.use((req, res, next) => {
     const start = Date.now();

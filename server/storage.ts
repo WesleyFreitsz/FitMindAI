@@ -19,11 +19,9 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 
-// Interface para o usuário sem a senha, para ser usado externamente
 export type SafeUser = Omit<User, "password">;
 
 export interface IStorage {
-  // Métodos de Usuário
   getUser(id: string): Promise<SafeUser | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -33,23 +31,19 @@ export interface IStorage {
     data: Partial<InsertUser>
   ): Promise<SafeUser | undefined>;
 
-  // Métodos de Alimentos
   getFoods(): Promise<Food[]>;
   getFoodById(id: string): Promise<Food | undefined>;
   searchFoods(query: string): Promise<Food[]>;
   createFood(food: Omit<Food, "id">): Promise<Food>;
 
-  // Métodos de Log de Alimentos
   getFoodLogs(userId: string, date?: Date): Promise<FoodLog[]>;
   createFoodLog(log: InsertFoodLog): Promise<FoodLog>;
   deleteFoodLog(id: string): Promise<boolean>;
 
-  // Métodos de Exercícios
   getExercises(userId: string, date?: Date): Promise<Exercise[]>;
   createExercise(exercise: InsertExercise): Promise<Exercise>;
   deleteExercise(id: string): Promise<boolean>;
 
-  // Métodos de Alarmes
   getAlarms(userId: string): Promise<Alarm[]>;
   createAlarm(alarm: InsertAlarm): Promise<Alarm>;
   updateAlarm(
@@ -67,7 +61,6 @@ class DrizzleStorage implements IStorage {
     this.db = drizzle(client);
   }
 
-  // --- Métodos de Usuário ---
   async getUser(id: string): Promise<SafeUser | undefined> {
     const user = await this.db.select().from(users).where(eq(users.id, id));
     if (user.length > 0) {
@@ -110,7 +103,6 @@ class DrizzleStorage implements IStorage {
     }
     return undefined;
   }
-  // --- Métodos de Alimentos ---
   async getFoods(): Promise<Food[]> {
     return this.db.select().from(foods);
   }
@@ -132,7 +124,6 @@ class DrizzleStorage implements IStorage {
     return newFood[0];
   }
 
-  // --- Métodos de Log de Alimentos ---
   async getFoodLogs(userId: string, date?: Date): Promise<FoodLog[]> {
     if (date) {
       const year = date.getUTCFullYear();
@@ -168,7 +159,6 @@ class DrizzleStorage implements IStorage {
     return result.length > 0;
   }
 
-  // --- Métodos de Exercícios ---
   async getExercises(userId: string, date?: Date): Promise<Exercise[]> {
     if (date) {
       const year = date.getUTCFullYear();
@@ -207,7 +197,6 @@ class DrizzleStorage implements IStorage {
     return result.length > 0;
   }
 
-  // --- Métodos de Alarmes ---
   async getAlarms(userId: string): Promise<Alarm[]> {
     return this.db.select().from(alarms).where(eq(alarms.userId, userId));
   }
