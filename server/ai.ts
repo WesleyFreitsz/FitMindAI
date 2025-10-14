@@ -6,12 +6,12 @@ import {
 import { User } from "@shared/schema";
 
 // Pega a chave do ambiente que configuramos
-const apiKey = process.env.GOOGLE_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 if (!apiKey) {
-  throw new Error("GOOGLE_API_KEY is not set in the environment variables");
+  console.warn("GEMINI_API_KEY is not set - AI features will be disabled");
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // Configurações do modelo para garantir a saída em JSON
 const generationConfig = {
@@ -41,7 +41,7 @@ const safetySettings = [
   },
 ];
 
-const model = genAI.getGenerativeModel({
+const model = genAI?.getGenerativeModel({
   model: "gemini-2.0-flash",
   generationConfig,
   safetySettings,
@@ -81,6 +81,13 @@ export async function parseUserInput(
   text: string,
   user: User
 ): Promise<ParsedWorkout> {
+  if (!model) {
+    return {
+      type: "question",
+      answer: "AI features are disabled. Please configure GEMINI_API_KEY.",
+    };
+  }
+  
   const prompt = `
     Você é um assistente de nutrição e fitness especialista chamado FitMind AI. Sua principal função é analisar a entrada do usuário e categorizá-la em uma de três intenções: 'food' (registro de comida), 'workout' (registro de treino), ou 'question' (pergunta geral).
 
@@ -130,6 +137,10 @@ export async function estimateFoodNutrition(
   portion: number,
   unit: string
 ): Promise<FoodNutrition | null> {
+  if (!model) {
+    return null;
+  }
+  
   const prompt = `
       Você é um especialista em nutrição. Estime os valores nutricionais do alimento solicitado.
       Retorne um JSON com: { "name": "nome do alimento", "calories": número, "protein": número, "carbs": número, "fat": número, "portion": número, "unit": "unidade" }.
@@ -151,6 +162,10 @@ export async function chatWithAI(
   messages: { role: "user" | "assistant"; content: string }[],
   user: User
 ): Promise<string> {
+  if (!genAI) {
+    return "AI features are disabled. Please configure GEMINI_API_KEY.";
+  }
+  
   const chatModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Modelo para chat, sem modo JSON forçado
 
   // Converte o histórico de mensagens para o formato do Gemini
