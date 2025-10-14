@@ -235,6 +235,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  apiRouter.get("/food-logs/range", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.json({});
+    }
+    const user = req.user as AppUser;
+    const start = new Date(req.query.start as string);
+    const end = new Date(req.query.end as string);
+
+    const result: Record<string, any[]> = {};
+    const currentDate = new Date(start);
+
+    while (currentDate <= end) {
+      const dateStr = currentDate.toISOString().split("T")[0];
+      const logs = await storage.getFoodLogs(user.id, currentDate);
+      const enrichedLogs = await Promise.all(
+        logs.map(async (log: FoodLog) => {
+          const food = await storage.getFoodById(log.foodId);
+          return { ...log, food };
+        })
+      );
+      result[dateStr] = enrichedLogs;
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    res.json(result);
+  });
+
   apiRouter.get("/exercises", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.json([]); // Retorna array vazio para convidados
@@ -257,6 +284,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ...req.body,
     });
     res.json(exercise);
+  });
+
+  apiRouter.get("/exercises/range", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.json({});
+    }
+    const user = req.user as AppUser;
+    const start = new Date(req.query.start as string);
+    const end = new Date(req.query.end as string);
+
+    const result: Record<string, any[]> = {};
+    const currentDate = new Date(start);
+
+    while (currentDate <= end) {
+      const dateStr = currentDate.toISOString().split("T")[0];
+      const exercises = await storage.getExercises(user.id, currentDate);
+      result[dateStr] = exercises;
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    res.json(result);
   });
 
   apiRouter.post("/chat", async (req: Request, res: Response) => {

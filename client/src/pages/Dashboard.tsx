@@ -1,89 +1,132 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import CalorieRing from '@/components/CalorieRing';
 import MacroBar from '@/components/MacroBar';
-import FoodLogCard from '@/components/FoodLogCard';
+import MealSummary from '@/components/MealSummary';
 import WorkoutCard from '@/components/WorkoutCard';
 import AISuggestionCard from '@/components/AISuggestionCard';
 import WeightProjection from '@/components/WeightProjection';
-import QuickAddFood from '@/components/QuickAddFood';
-import { Utensils, Dumbbell, TrendingDown } from 'lucide-react';
+import { Utensils, Dumbbell, TrendingDown, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { useUser, useFoodLogs, useDeleteFoodLog, useExercises } from '@/lib/hooks';
+import { calculateCalorieGoal, calculateMacroGoals, calculateDailyStats } from '@/lib/calculations';
+import { format, addDays, subDays, parse } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/context/AuthContext';
+import { useLocation, useSearch } from 'wouter';
 
 export default function Dashboard() {
-  //todo: remove mock functionality
-  const [mockCalories] = useState({
-    consumed: 1850,
-    target: 2200,
-    burned: 350,
+  const searchParams = new URLSearchParams(useSearch());
+  const dateParam = searchParams.get('date');
+  const [, setLocation] = useLocation();
+  
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (dateParam) {
+      try {
+        return parse(dateParam, 'yyyy-MM-dd', new Date());
+      } catch {
+        return new Date();
+      }
+    }
+    return new Date();
   });
 
-  const [mockMacros] = useState({
-    protein: { current: 120, target: 150 },
-    carbs: { current: 200, target: 250 },
-    fat: { current: 55, target: 70 },
-  });
+  useEffect(() => {
+    if (dateParam) {
+      try {
+        const date = parse(dateParam, 'yyyy-MM-dd', new Date());
+        setSelectedDate(date);
+      } catch {
+        setSelectedDate(new Date());
+      }
+    }
+  }, [dateParam]);
+  const { user: authUser } = useAuth();
+  const { data: userProfile } = useUser();
+  const { data: foodLogs = [] } = useFoodLogs(selectedDate);
+  const { data: exercises = [] } = useExercises(selectedDate);
+  const deleteFoodLog = useDeleteFoodLog();
 
-  const mockFoods = [
-    {
-      id: '1',
-      foodName: 'Peito de Frango Grelhado',
-      portion: '200g',
-      calories: 330,
-      protein: 62,
-      carbs: 0,
-      fat: 7,
-      time: '12:30',
-    },
-    {
-      id: '2',
-      foodName: 'Arroz Integral',
-      portion: '150g',
-      calories: 195,
-      protein: 4,
-      carbs: 41,
-      fat: 2,
-      time: '12:35',
-    },
-  ];
+  const user = userProfile || authUser;
 
-  const mockWorkouts = [
-    {
-      id: '1',
-      type: 'Musculação',
-      duration: 60,
-      intensity: 4,
-      caloriesBurned: 350,
-      time: '18:00',
-    },
-  ];
+  const calorieGoals = user && !authUser?.isGuest ? calculateCalorieGoal(user) : { target: 2200, bmr: 1800, tdee: 2200 };
+  const macroGoals = user && !authUser?.isGuest ? calculateMacroGoals(user) : { protein: 150, carbs: 250, fat: 70 };
 
-  const mockWeightData = [
-    { day: 'Seg', weight: 78.5 },
-    { day: 'Ter', weight: 78.2 },
-    { day: 'Qua', weight: 78.0 },
-    { day: 'Qui', weight: 77.8 },
-    { day: 'Sex', weight: 77.5 },
-    { day: 'Sáb', weight: 77.3 },
-    { day: 'Dom', weight: 77.0 },
-  ];
+  const dailyStats = calculateDailyStats(foodLogs, exercises);
+
+  const groupedLogs = {
+    café: foodLogs.filter(log => log.meal === 'café'),
+    almoço: foodLogs.filter(log => log.meal === 'almoço'),
+    jantar: foodLogs.filter(log => log.meal === 'jantar'),
+    lanches: foodLogs.filter(log => log.meal === 'lanches'),
+  };
+
+  const handleDeleteLog = (logId: string) => {
+    deleteFoodLog.mutate(logId);
+  };
+
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+
+  const proteinPercent = macroGoals.protein > 0 ? (dailyStats.protein / macroGoals.protein) * 100 : 0;
+  const carbsPercent = macroGoals.carbs > 0 ? (dailyStats.carbs / macroGoals.carbs) * 100 : 0;
+  const fatPercent = macroGoals.fat > 0 ? (dailyStats.fat / macroGoals.fat) * 100 : 0;
+
+  const proteinRemaining = Math.max(0, macroGoals.protein - dailyStats.protein);
+  const calorieDeficit = calorieGoals.target - dailyStats.consumed;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Acompanhe seu progresso diário</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Acompanhe seu progresso diário</p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSelectedDate(subDays(selectedDate, 1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div className="flex items-center gap-2 min-w-[200px] justify-center">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">
+              {format(selectedDate, "d 'de' MMMM, yyyy", { locale: ptBR })}
+            </span>
+          </div>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+            disabled={format(selectedDate, 'yyyy-MM-dd') >= format(new Date(), 'yyyy-MM-dd')}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          
+          {!isToday && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setSelectedDate(new Date())}
+            >
+              Hoje
+            </Button>
+          )}
+        </div>
       </div>
-
-      <QuickAddFood onSubmit={(text) => console.log('Food added:', text)} />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="md:col-span-2 lg:col-span-1">
           <CardContent className="pt-6">
             <div className="h-[280px]">
               <CalorieRing
-                consumed={mockCalories.consumed}
-                target={mockCalories.target}
-                burned={mockCalories.burned}
+                consumed={dailyStats.consumed}
+                target={calorieGoals.target}
+                burned={dailyStats.burned}
               />
             </div>
           </CardContent>
@@ -96,43 +139,22 @@ export default function Dashboard() {
           <CardContent className="space-y-4">
             <MacroBar
               label="Proteína"
-              current={mockMacros.protein.current}
-              target={mockMacros.protein.target}
+              current={dailyStats.protein}
+              target={macroGoals.protein}
               color="hsl(var(--chart-2))"
             />
             <MacroBar
               label="Carboidratos"
-              current={mockMacros.carbs.current}
-              target={mockMacros.carbs.target}
+              current={dailyStats.carbs}
+              target={macroGoals.carbs}
               color="hsl(var(--chart-3))"
             />
             <MacroBar
               label="Gordura"
-              current={mockMacros.fat.current}
-              target={mockMacros.fat.target}
+              current={dailyStats.fat}
+              target={macroGoals.fat}
               color="hsl(var(--chart-4))"
             />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <WeightProjection
-          currentWeight={78.5}
-          projectedWeight={77.0}
-          weeklyData={mockWeightData}
-        />
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-primary" />
-              Sugestões da IA
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <AISuggestionCard message="Faltam 30g de proteína para atingir sua meta diária. Que tal adicionar um shake proteico?" />
-            <AISuggestionCard message="Seu déficit calórico está ideal para perder 0.5kg esta semana. Continue assim!" />
           </CardContent>
         </Card>
       </div>
@@ -142,18 +164,30 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Utensils className="h-5 w-5" />
-              Alimentação Recente
+              Refeições do Dia
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockFoods.map((food) => (
-              <FoodLogCard
-                key={food.id}
-                {...food}
-                onDelete={() => console.log('Delete food:', food.id)}
-                onEdit={() => console.log('Edit food:', food.id)}
-              />
-            ))}
+            <MealSummary
+              meal="cafe"
+              logs={groupedLogs.café}
+              onDeleteLog={handleDeleteLog}
+            />
+            <MealSummary
+              meal="almoco"
+              logs={groupedLogs.almoço}
+              onDeleteLog={handleDeleteLog}
+            />
+            <MealSummary
+              meal="jantar"
+              logs={groupedLogs.jantar}
+              onDeleteLog={handleDeleteLog}
+            />
+            <MealSummary
+              meal="lanches"
+              logs={groupedLogs.lanches}
+              onDeleteLog={handleDeleteLog}
+            />
           </CardContent>
         </Card>
 
@@ -165,16 +199,60 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockWorkouts.map((workout) => (
-              <WorkoutCard
-                key={workout.id}
-                {...workout}
-                onDelete={() => console.log('Delete workout:', workout.id)}
-              />
-            ))}
+            {exercises.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum treino registrado hoje
+              </p>
+            ) : (
+              exercises.map((workout) => (
+                <WorkoutCard
+                  key={workout.id}
+                  id={workout.id}
+                  type={workout.type}
+                  duration={workout.duration}
+                  intensity={workout.intensity}
+                  caloriesBurned={workout.caloriesBurned}
+                  time={format(new Date(workout.timestamp), 'HH:mm')}
+                  onDelete={() => console.log('Delete workout:', workout.id)}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {isToday && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-primary" />
+              Sugestões da IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {proteinRemaining > 10 && (
+              <AISuggestionCard 
+                message={`Faltam ${proteinRemaining.toFixed(0)}g de proteína para atingir sua meta diária. Que tal adicionar um shake proteico ou peito de frango?`} 
+              />
+            )}
+            {calorieDeficit > 100 && (
+              <AISuggestionCard 
+                message={`Você ainda tem ${calorieDeficit} kcal disponíveis hoje. Continue assim para atingir sua meta!`} 
+              />
+            )}
+            {calorieDeficit < -200 && (
+              <AISuggestionCard 
+                message={`Você excedeu sua meta calórica em ${Math.abs(calorieDeficit)} kcal. Considere um treino extra ou ajuste as próximas refeições.`} 
+              />
+            )}
+            {proteinPercent >= 90 && carbsPercent >= 90 && fatPercent >= 90 && (
+              <AISuggestionCard 
+                message={`Parabéns! Você atingiu todas as suas metas de macronutrientes hoje! 💪`} 
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -244,3 +244,33 @@ export function useChatWithAI() {
     },
   });
 }
+
+export function useFoodLogsRange(startDate: Date, endDate: Date) {
+  const { user } = useAuth();
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  return useQuery<Record<string, (FoodLog & { food?: Food })[]>>({
+    queryKey: ["/api/food-logs/range", startStr, endStr],
+    enabled: !user?.isGuest,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/food-logs/range?start=${startStr}&end=${endStr}`);
+      return res.json();
+    },
+  });
+}
+
+export function useExercisesRange(startDate: Date, endDate: Date) {
+  const { user } = useAuth();
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  return useQuery<Record<string, Exercise[]>>({
+    queryKey: ["/api/exercises/range", startStr, endStr],
+    enabled: !user?.isGuest,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/exercises/range?start=${startStr}&end=${endStr}`);
+      return res.json();
+    },
+  });
+}

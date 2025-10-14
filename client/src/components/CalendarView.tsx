@@ -2,26 +2,23 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-
-interface DayData {
-  date: string;
-  calories: number;
-  target: number;
-  workouts: number;
-}
+import { useFoodLogsRange, useExercisesRange, useUser } from '@/lib/hooks';
+import { calculateCalorieGoal, calculateDailyStats } from '@/lib/calculations';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { useLocation } from 'wouter';
 
 export default function CalendarView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [, setLocation] = useLocation();
+  
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
 
-  // Mock data para o calendário
-  const mockDaysData: DayData[] = [
-    { date: '2025-10-01', calories: 2100, target: 2200, workouts: 1 },
-    { date: '2025-10-02', calories: 2050, target: 2200, workouts: 0 },
-    { date: '2025-10-03', calories: 2300, target: 2200, workouts: 1 },
-    { date: '2025-10-04', calories: 1950, target: 2200, workouts: 1 },
-    { date: '2025-10-05', calories: 2150, target: 2200, workouts: 0 },
-  ];
+  const { data: userProfile } = useUser();
+  const { data: foodLogs = {} } = useFoodLogsRange(monthStart, monthEnd);
+  const { data: exercises = {} } = useExercisesRange(monthStart, monthEnd);
+
+  const calorieTarget = userProfile ? calculateCalorieGoal(userProfile).target : 2200;
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -37,15 +34,24 @@ export default function CalendarView() {
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
 
   const getDayStatus = (day: number) => {
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayData = mockDaysData.find(d => d.date === dateStr);
+    const dateStr = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day), 'yyyy-MM-dd');
+    const logs = foodLogs[dateStr] || [];
+    const dayExercises = exercises[dateStr] || [];
     
-    if (!dayData) return null;
+    if (logs.length === 0 && dayExercises.length === 0) return null;
     
-    const difference = dayData.calories - dayData.target;
+    const stats = calculateDailyStats(logs, dayExercises);
+    const difference = stats.consumed - calorieTarget;
+    
     if (Math.abs(difference) <= 100) return 'success';
     if (difference < -100) return 'warning';
     return 'danger';
+  };
+
+  const handleDayClick = (day: number) => {
+    const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    setLocation(`/?date=${dateStr}`);
   };
 
   const monthNames = [
@@ -104,6 +110,7 @@ export default function CalendarView() {
             return (
               <button
                 key={day}
+                onClick={() => handleDayClick(day)}
                 className={`aspect-square p-1 rounded-md text-sm hover-elevate active-elevate-2 ${
                   isToday ? 'ring-2 ring-primary' : ''
                 } ${
