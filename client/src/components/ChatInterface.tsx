@@ -295,13 +295,7 @@ export default function ChatInterface() {
       </div>
       <div className="flex flex-col gap-4 mt-4">
         <AISuggestionCard
-          message={'Experimente dizer "corri por 30 minutos"'}
-        />
-        <AISuggestionCard
           message={'Tente "comi 2 fatias de pão integral e 2 ovos"'}
-        />
-        <AISuggestionCard
-          message={'Pergunte "qual o melhor cardio para queimar gordura?"'}
         />
       </div>
     </div>
