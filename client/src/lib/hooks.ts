@@ -74,7 +74,6 @@ export function useFoodLogs(date?: Date) {
 
 export function useCreateFoodLog() {
   const { user } = useAuth();
-  const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: {
       foodId?: string;
@@ -83,16 +82,23 @@ export function useCreateFoodLog() {
       meal: string;
     }) => {
       if (user?.isGuest) {
-        toast({ title: "Faça login para salvar suas refeições." });
-        return Promise.resolve();
+        // Rejeita a promessa com uma mensagem clara para o catch do componente lidar
+        return Promise.reject(
+          new Error("Faça login para salvar suas refeições.")
+        );
       }
       const res = await apiRequest("POST", "/api/food-logs", data);
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data) {
-        queryClient.invalidateQueries({ queryKey: ["food-logs"] });
+      // Garante que a resposta seja JSON antes de tentar fazer o parse
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        return res.json();
       }
+      // Retorna um objeto vazio para respostas de sucesso sem corpo JSON
+      return {};
+    },
+    onSuccess: () => {
+      // Invalida a query após o sucesso da mutação
+      queryClient.invalidateQueries({ queryKey: ["food-logs"] });
     },
   });
 }

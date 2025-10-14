@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const activityLevels = [
@@ -53,6 +53,7 @@ export default function RegisterPage() {
   const [, navigate] = useLocation();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -133,16 +134,31 @@ export default function RegisterPage() {
                 disabled={isLoading}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="password">Senha (mínimo 6 caracteres)</Label>
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
                 required
                 disabled={isLoading}
+                className="pr-10"
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 h-7 w-7"
+                onClick={() => setShowPassword((prev) => !prev)}
+                disabled={isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

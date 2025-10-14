@@ -25,7 +25,6 @@ interface Message {
   timestamp: string;
 }
 
-// Garante que PendingFood tenha todos os campos necessários para InsertFood
 type PendingFood = InsertFood & {
   foodId?: string;
   portion: number;
@@ -72,8 +71,6 @@ export default function ChatInterface() {
 
     try {
       const parsedResult = await parseFoodMutation.mutateAsync(userInput);
-
-      // CORREÇÃO: Achata o array se ele vier aninhado
       const foods = Array.isArray(parsedResult) ? parsedResult.flat() : [];
 
       if (
@@ -107,7 +104,6 @@ export default function ChatInterface() {
           .map((m) => ({ role: m.role, content: m.content }));
 
         conversationHistory.push({ role: "user", content: userInput });
-
         const chatResult = await chatMutation.mutateAsync(conversationHistory);
 
         const aiMessage: Message = {
@@ -135,52 +131,72 @@ export default function ChatInterface() {
   ) => {
     if (pendingFoods.length === 0) return;
 
+    let isGuestAction = false;
+
     try {
-      for (const food of pendingFoods) {
-        await createLogMutation.mutateAsync({
+      const createPromises = pendingFoods.map((food) =>
+        createLogMutation.mutateAsync({
           foodId: food.foodId,
           foodData: food.foodId ? undefined : food,
           portion: food.portion,
           meal,
-        });
-      }
-
-      const totals = pendingFoods.reduce(
-        (acc, food) => {
-          acc.calories += food.calories || 0;
-          acc.protein += food.protein || 0;
-          acc.carbs += food.carbs || 0;
-          acc.fat += food.fat || 0;
-          return acc;
-        },
-        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        })
       );
-
-      const foodNames = pendingFoods.map((f) => f.name).join(", ");
-      const summary = `Calorias: ${totals.calories.toFixed(
-        0
-      )}kcal, P: ${totals.protein.toFixed(0)}g, C: ${totals.carbs.toFixed(
-        0
-      )}g, G: ${totals.fat.toFixed(0)}g`;
-
-      const aiMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: `Ótimo! Registrei ${foodNames} no seu ${meal}. Resumo: ${summary}`,
-        timestamp: new Date().toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      };
-
-      setMessages((prev) => prev.filter((m) => m.role !== "system"));
-      setMessages((prev) => [...prev, aiMessage]);
-      setPendingFoods([]);
+      await Promise.all(createPromises);
     } catch (error) {
+      if (error instanceof Error && error.message.includes("Faça login")) {
+        isGuestAction = true;
+      } else {
+        console.error("Erro detalhado ao registrar refeição:", error);
+        toast({
+          title: "Erro ao registrar",
+          description: "Não foi possível salvar seu alimento.",
+          variant: "destructive",
+        });
+        setPendingFoods([]);
+        setMessages((prev) => prev.filter((m) => m.role !== "system"));
+        return;
+      }
+    }
+
+    // CORREÇÃO: Converte os valores para número antes de somar
+    const totals = pendingFoods.reduce(
+      (acc, food) => {
+        acc.calories += parseFloat(String(food.calories)) || 0;
+        acc.protein += parseFloat(String(food.protein)) || 0;
+        acc.carbs += parseFloat(String(food.carbs)) || 0;
+        acc.fat += parseFloat(String(food.fat)) || 0;
+        return acc;
+      },
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
+
+    const foodNames = pendingFoods.map((f) => f.name).join(", ");
+    const summary = `Calorias: ${totals.calories.toFixed(
+      0
+    )}kcal, P: ${totals.protein.toFixed(0)}g, C: ${totals.carbs.toFixed(
+      0
+    )}g, G: ${totals.fat.toFixed(0)}g`;
+
+    const aiMessage: Message = {
+      id: Date.now().toString(),
+      role: "assistant",
+      content: `Ótimo! Registrei ${foodNames} no seu ${meal}. Resumo: ${summary}`,
+      timestamp: new Date().toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    setMessages((prev) => prev.filter((m) => m.role !== "system"));
+    setMessages((prev) => [...prev, aiMessage]);
+    setPendingFoods([]);
+
+    if (isGuestAction) {
       toast({
-        title: "Erro ao registrar",
-        description: "Não foi possível salvar seu alimento.",
-        variant: "destructive",
+        title: "Faça o login",
+        description:
+          "Suas refeições não serão salvas até que você entre na sua conta.",
       });
     }
   };
