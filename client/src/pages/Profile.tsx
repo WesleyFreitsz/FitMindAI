@@ -1,28 +1,67 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import WeightProjection from '@/components/WeightProjection';
-import { Calculator, Save, Target, TrendingDown, Scale, Loader2 } from 'lucide-react';
-import { useUser, useUpdateUser } from '@/lib/hooks';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import WeightProjection from "@/components/WeightProjection";
+import {
+  Calculator,
+  Save,
+  Target,
+  TrendingDown,
+  Scale,
+  Loader2,
+} from "lucide-react";
+import {
+  useUser,
+  useUpdateUser,
+  useFoodLogsRange,
+  useExercisesRange,
+} from "@/lib/hooks";
+import { useToast } from "@/hooks/use-toast";
+import {
+  calculateTDEE,
+  calculateDailyStats,
+  calculateBMR,
+} from "@/lib/calculations";
+import { subDays, eachDayOfInterval, format } from "date-fns";
 
 export default function Profile() {
   const { data: user, isLoading } = useUser();
   const updateUser = useUpdateUser();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState({
-    name: '',
+    name: "",
     age: 0,
-    sex: '',
+    sex: "",
     weight: 0,
     height: 0,
-    goal: '',
-    activityLevel: '',
+    goal: "",
+    activityLevel: "",
   });
+
+  const [avgDailySurplus, setAvgDailySurplus] = useState(0);
+  const [weeklyWeightChange, setWeeklyWeightChange] = useState(0);
+
+  // --- Busca de dados para as projeções ---
+  const today = new Date();
+  const sevenDaysAgo = subDays(today, 6);
+  const { data: foodLogs, isLoading: foodLoading } = useFoodLogsRange(
+    sevenDaysAgo,
+    today
+  );
+  const { data: exercises, isLoading: exercisesLoading } = useExercisesRange(
+    sevenDaysAgo,
+    today
+  );
 
   useEffect(() => {
     if (user) {
@@ -38,58 +77,72 @@ export default function Profile() {
     }
   }, [user]);
 
+  // --- Efeito para calcular as estimativas dinâmicas ---
+  useEffect(() => {
+    if (user && foodLogs && exercises) {
+      const tdee = calculateTDEE(user);
+      const dateRange = eachDayOfInterval({ start: sevenDaysAgo, end: today });
+
+      let totalNetCalories = 0;
+      let daysWithData = 0;
+
+      dateRange.forEach((date) => {
+        const dateStr = format(date, "yyyy-MM-dd");
+        const dailyLogs = foodLogs[dateStr] || [];
+        const dailyExercises = exercises[dateStr] || [];
+
+        if (dailyLogs.length > 0 || dailyExercises.length > 0) {
+          daysWithData++;
+          const stats = calculateDailyStats(dailyLogs, dailyExercises);
+          totalNetCalories += stats.consumed - stats.burned;
+        }
+      });
+
+      if (daysWithData > 0) {
+        const avgDailyNetCalories = totalNetCalories / daysWithData;
+        const surplus = avgDailyNetCalories - tdee;
+        const weeklyChange = (surplus * 7) / 7700;
+
+        setAvgDailySurplus(surplus);
+        setWeeklyWeightChange(weeklyChange);
+      } else {
+        setAvgDailySurplus(0);
+        setWeeklyWeightChange(0);
+      }
+    }
+  }, [user, foodLogs, exercises, sevenDaysAgo, today]);
+
   const handleSave = async () => {
     try {
       await updateUser.mutateAsync(formData);
       toast({
-        title: 'Perfil atualizado',
-        description: 'Suas informações foram salvas com sucesso',
+        title: "Perfil atualizado",
+        description: "Suas informações foram salvas com sucesso",
       });
     } catch (error) {
       toast({
-        title: 'Erro ao salvar',
-        description: 'Não foi possível atualizar seu perfil',
-        variant: 'destructive',
+        title: "Erro ao salvar",
+        description: "Não foi possível atualizar seu perfil",
+        variant: "destructive",
       });
     }
   };
 
-  const calculateBMR = () => {
-    const { weight, height, age, sex } = formData;
-    if (sex === 'masculino') {
-      return 10 * weight + 6.25 * height - 5 * age + 5;
-    } else {
-      return 10 * weight + 6.25 * height - 5 * age - 161;
-    }
-  };
-
-  const calculateTDEE = () => {
-    const bmr = calculateBMR();
-    const multipliers = {
-      sedentario: 1.2,
-      leve: 1.375,
-      moderado: 1.55,
-      intenso: 1.725,
-      muito_intenso: 1.9,
-    };
-    return bmr * (multipliers[formData.activityLevel as keyof typeof multipliers] || 1.55);
-  };
-
   const getTargetCalories = () => {
-    const tdee = calculateTDEE();
-    if (formData.goal === 'perder') return tdee - 500;
-    if (formData.goal === 'ganhar') return tdee + 300;
+    const tdee = calculateTDEE(formData);
+    if (formData.goal === "perder") return tdee - 500;
+    if (formData.goal === "ganhar") return tdee + 300;
     return tdee;
   };
 
   const mockWeightData = [
-    { day: 'Seg', weight: formData.weight },
-    { day: 'Ter', weight: formData.weight - 0.3 },
-    { day: 'Qua', weight: formData.weight - 0.5 },
-    { day: 'Qui', weight: formData.weight - 0.7 },
-    { day: 'Sex', weight: formData.weight - 1 },
-    { day: 'Sáb', weight: formData.weight - 1.2 },
-    { day: 'Dom', weight: formData.weight - 1.5 },
+    { day: "Seg", weight: formData.weight },
+    { day: "Ter", weight: formData.weight - 0.3 },
+    { day: "Qua", weight: formData.weight - 0.5 },
+    { day: "Qui", weight: formData.weight - 0.7 },
+    { day: "Sex", weight: formData.weight - 1 },
+    { day: "Sáb", weight: formData.weight - 1.2 },
+    { day: "Dom", weight: formData.weight - 1.5 },
   ];
 
   if (isLoading) {
@@ -103,8 +156,12 @@ export default function Profile() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Perfil e Métricas</h1>
-        <p className="text-muted-foreground">Acompanhe seu peso, metas e projeções</p>
+        <h1 className="text-3xl font-bold text-foreground">
+          Perfil e Métricas
+        </h1>
+        <p className="text-muted-foreground">
+          Acompanhe seu peso, metas e projeções
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -124,7 +181,12 @@ export default function Profile() {
                   type="number"
                   step="0.1"
                   value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      weight: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   data-testid="input-weight"
                 />
               </div>
@@ -135,7 +197,12 @@ export default function Profile() {
                   id="height"
                   type="number"
                   value={formData.height}
-                  onChange={(e) => setFormData({ ...formData, height: parseInt(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      height: parseInt(e.target.value) || 0,
+                    })
+                  }
                   data-testid="input-height"
                 />
               </div>
@@ -148,14 +215,24 @@ export default function Profile() {
                   id="age"
                   type="number"
                   value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      age: parseInt(e.target.value) || 0,
+                    })
+                  }
                   data-testid="input-age"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="sex">Sexo</Label>
-                <Select value={formData.sex} onValueChange={(value) => setFormData({ ...formData, sex: value })}>
+                <Select
+                  value={formData.sex}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, sex: value })
+                  }
+                >
                   <SelectTrigger id="sex" data-testid="select-sex">
                     <SelectValue />
                   </SelectTrigger>
@@ -179,7 +256,12 @@ export default function Profile() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="goal">Meta Principal</Label>
-              <Select value={formData.goal} onValueChange={(value) => setFormData({ ...formData, goal: value })}>
+              <Select
+                value={formData.goal}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, goal: value })
+                }
+              >
                 <SelectTrigger id="goal" data-testid="select-goal">
                   <SelectValue />
                 </SelectTrigger>
@@ -193,7 +275,12 @@ export default function Profile() {
 
             <div className="space-y-2">
               <Label htmlFor="activity">Nível de Atividade</Label>
-              <Select value={formData.activityLevel} onValueChange={(value) => setFormData({ ...formData, activityLevel: value })}>
+              <Select
+                value={formData.activityLevel}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, activityLevel: value })
+                }
+              >
                 <SelectTrigger id="activity" data-testid="select-activity">
                   <SelectValue />
                 </SelectTrigger>
@@ -202,14 +289,16 @@ export default function Profile() {
                   <SelectItem value="leve">Levemente Ativo</SelectItem>
                   <SelectItem value="moderado">Moderadamente Ativo</SelectItem>
                   <SelectItem value="intenso">Muito Ativo</SelectItem>
-                  <SelectItem value="muito_intenso">Extremamente Ativo</SelectItem>
+                  <SelectItem value="muito_intenso">
+                    Extremamente Ativo
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Button 
-              onClick={handleSave} 
-              className="w-full" 
+            <Button
+              onClick={handleSave}
+              className="w-full"
               disabled={updateUser.isPending}
               data-testid="button-save-profile"
             >
@@ -234,25 +323,51 @@ export default function Profile() {
         <CardContent>
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Taxa Metabólica Basal</p>
-              <p className="text-2xl font-bold font-mono text-foreground">
-                {calculateBMR().toFixed(0)} <span className="text-base font-normal text-muted-foreground">kcal/dia</span>
+              <p className="text-sm text-muted-foreground">
+                Taxa Metabólica Basal
               </p>
-              <p className="text-xs text-muted-foreground">BMR (Mifflin-St Jeor)</p>
+              <p className="text-2xl font-bold font-mono text-foreground">
+                {calculateBMR(formData).toFixed(0)}{" "}
+                <span className="text-base font-normal text-muted-foreground">
+                  kcal/dia
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                BMR (Mifflin-St Jeor)
+              </p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Gasto Energético Total</p>
-              <p className="text-2xl font-bold font-mono text-foreground">
-                {calculateTDEE().toFixed(0)} <span className="text-base font-normal text-muted-foreground">kcal/dia</span>
+              <p className="text-sm text-muted-foreground">
+                Gasto Energético Total
               </p>
-              <p className="text-xs text-muted-foreground">TDEE (com atividade)</p>
+              <p className="text-2xl font-bold font-mono text-foreground">
+                {calculateTDEE(formData).toFixed(0)}{" "}
+                <span className="text-base font-normal text-muted-foreground">
+                  kcal/dia
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                TDEE (com atividade)
+              </p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Meta Calórica Diária</p>
+              <p className="text-sm text-muted-foreground">
+                Meta Calórica Diária
+              </p>
               <p className="text-2xl font-bold font-mono text-primary">
-                {getTargetCalories().toFixed(0)} <span className="text-base font-normal text-muted-foreground">kcal/dia</span>
+                {getTargetCalories().toFixed(0)}{" "}
+                <span className="text-base font-normal text-muted-foreground">
+                  kcal/dia
+                </span>
               </p>
-              <p className="text-xs text-muted-foreground">Para {formData.goal === 'perder' ? 'perder gordura' : formData.goal === 'ganhar' ? 'ganhar massa' : 'manter peso'}</p>
+              <p className="text-xs text-muted-foreground">
+                Para{" "}
+                {formData.goal === "perder"
+                  ? "perder gordura"
+                  : formData.goal === "ganhar"
+                  ? "ganhar massa"
+                  : "manter peso"}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -260,7 +375,7 @@ export default function Profile() {
 
       <WeightProjection
         currentWeight={formData.weight}
-        projectedWeight={formData.weight - 1.5}
+        projectedWeight={formData.weight + weeklyWeightChange}
         weeklyData={mockWeightData}
       />
 
@@ -268,26 +383,43 @@ export default function Profile() {
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <TrendingDown className="h-5 w-5" />
-            Estimativas de Progresso
+            Estimativas de Progresso (Baseado nos últimos 7 dias)
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-1">Déficit Calórico Diário</p>
+              <p className="text-sm text-muted-foreground mb-1">
+                Excedente/Défice Calórico Diário
+              </p>
               <p className="text-xl font-bold font-mono text-foreground">
-                {formData.goal === 'perder' ? '-500' : formData.goal === 'ganhar' ? '+300' : '0'} kcal
+                {foodLoading || exercisesLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  `${avgDailySurplus > 0 ? "+" : ""}${avgDailySurplus.toFixed(
+                    0
+                  )} kcal`
+                )}
               </p>
             </div>
             <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-1">Estimativa de Mudança Semanal</p>
+              <p className="text-sm text-muted-foreground mb-1">
+                Estimativa de Mudança Semanal
+              </p>
               <p className="text-xl font-bold font-mono text-foreground">
-                {formData.goal === 'perder' ? '-0.5' : formData.goal === 'ganhar' ? '+0.3' : '0'} kg
+                {foodLoading || exercisesLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  `${
+                    weeklyWeightChange > 0 ? "+" : ""
+                  }${weeklyWeightChange.toFixed(2)} kg`
+                )}
               </p>
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-4">
-            * Estimativas baseadas em 1kg ≈ 7700 kcal. Resultados podem variar.
+            * Estimativas baseadas na sua média de consumo e treino dos últimos
+            7 dias. Resultados podem variar.
           </p>
         </CardContent>
       </Card>

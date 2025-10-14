@@ -15,6 +15,7 @@ type AppUser = User & { isGuest?: boolean };
 interface AuthContextType {
   user: AppUser | null;
   isLoading: boolean;
+  isLoggingOut: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: Omit<InsertUser, "id">) => Promise<void>;
   logout: () => void;
@@ -40,6 +41,7 @@ const GUEST_USER: AppUser = {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [, navigate] = useLocation();
 
   useEffect(() => {
@@ -91,19 +93,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    setIsLoggingOut(true);
     try {
       await apiRequest("POST", "/api/auth/logout", {});
     } catch (error) {
       console.error("Falha ao fazer logout:", error);
     } finally {
-      // Ao deslogar, volta para o estado de convidado
-      setUser(GUEST_USER);
-      // Navega para a página inicial
-      navigate("/");
+      // Força um recarregamento completo da página, que irá resetar todo o estado.
+      window.location.href = "/";
     }
   };
 
-  const value = { user, isLoading, login, register, logout };
+  const value = { user, isLoading, isLoggingOut, login, register, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CalorieRing from "@/components/CalorieRing";
 import MacroBar from "@/components/MacroBar";
@@ -15,14 +15,42 @@ import {
   calculateMacroGoals,
   calculateDailyStats,
 } from "@/lib/calculations";
+import { useSearch } from "wouter";
+import { parse } from "date-fns";
 
 export default function DailySummary() {
-  const [today] = useState(new Date());
+  const searchParams = new URLSearchParams(useSearch());
+  const dateParam = searchParams.get("date");
+
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (dateParam) {
+      try {
+        return parse(dateParam, "yyyy-MM-dd", new Date());
+      } catch {
+        return new Date();
+      }
+    }
+    return new Date();
+  });
+
+  useEffect(() => {
+    if (dateParam) {
+      try {
+        const date = parse(dateParam, "yyyy-MM-dd", new Date());
+        setSelectedDate(date);
+      } catch {
+        setSelectedDate(new Date());
+      }
+    } else {
+      setSelectedDate(new Date());
+    }
+  }, [dateParam]);
 
   const { data: user, isLoading: userLoading } = useUser();
-  const { data: foodLogs = [], isLoading: logsLoading } = useFoodLogs(today);
+  const { data: foodLogs = [], isLoading: logsLoading } =
+    useFoodLogs(selectedDate);
   const { data: exercises = [], isLoading: exercisesLoading } =
-    useExercises(today);
+    useExercises(selectedDate);
   const deleteFoodLogMutation = useDeleteFoodLog();
 
   const isLoading = userLoading || logsLoading || exercisesLoading;

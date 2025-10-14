@@ -20,6 +20,14 @@ declare global {
   }
 }
 
+// Middleware para garantir que o usuário está autenticado
+function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.status(401).json({ error: "Não autorizado" });
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const authRouter = express.Router();
   const apiRouter = express.Router();
@@ -98,25 +106,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- ROTAS DE API (Agora todas públicas por padrão) ---
+  // --- ROTAS DE API (Protegidas e Públicas) ---
 
-  apiRouter.get("/user", (req: Request, res: Response) => {
-    if (req.isAuthenticated()) {
-      const { password, ...safeUser } = req.user as AppUser;
-      res.json(safeUser);
-    } else {
-      res.json(null); // Retorna nulo se o usuário for convidado
-    }
+  apiRouter.get("/user", ensureAuthenticated, (req: Request, res: Response) => {
+    const { password, ...safeUser } = req.user as AppUser;
+    res.json(safeUser);
   });
 
-  apiRouter.put("/user", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Não autorizado" });
+  apiRouter.put(
+    "/user",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const updated = await storage.updateUser(user.id, req.body);
+      res.json(updated);
     }
-    const user = req.user as AppUser;
-    const updated = await storage.updateUser(user.id, req.body);
-    res.json(updated);
-  });
+  );
 
   apiRouter.get("/foods", async (req: Request, res: Response) => {
     const query = req.query.q as string;
@@ -164,148 +169,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(parsed);
   });
 
-  apiRouter.get("/food-logs", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.json([]); // Retorna array vazio para convidados
-    }
-    const user = req.user as AppUser;
-    const date = req.query.date
-      ? new Date(req.query.date as string)
-      : new Date();
-    const logs = await storage.getFoodLogs(user.id, date);
+  apiRouter.get(
+    "/food-logs",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const date = req.query.date
+        ? new Date(req.query.date as string)
+        : new Date();
+      const logs = await storage.getFoodLogs(user.id, date);
 
-    const enrichedLogs = await Promise.all(
-      logs.map(async (log: FoodLog) => {
-        const food = await storage.getFoodById(log.foodId);
-        return { ...log, food };
-      })
-    );
-    res.json(enrichedLogs);
-  });
-
-  apiRouter.post("/food-logs", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-    const user = req.user as AppUser;
-    const { foodId, foodData, portion, meal } = req.body;
-
-    let finalFoodId = foodId;
-
-    // Se não houver ID, mas houver dados, cria um novo alimento
-    if (!finalFoodId && foodData) {
-      // Normaliza os dados da IA para uma porção de 100g antes de salvar
-      const multiplier = 100 / (foodData.portion || 100);
-      const normalizedFood = {
-        name: foodData.name,
-        calories: (foodData.calories || 0) * multiplier,
-        protein: (foodData.protein || 0) * multiplier,
-        carbs: (foodData.carbs || 0) * multiplier,
-        fat: (foodData.fat || 0) * multiplier,
-        servingSize: 100,
-        servingUnit: "g",
-      };
-      const newFood = await storage.createFood(normalizedFood);
-      finalFoodId = newFood.id;
-    }
-
-    if (!finalFoodId) {
-      return res.status(400).json({ error: "foodId or foodData is required" });
-    }
-
-    const log = await storage.createFoodLog({
-      userId: user.id,
-      foodId: finalFoodId,
-      portion,
-      meal,
-    });
-    res.json(log);
-  });
-
-  apiRouter.delete("/food-logs/:id", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-    const { id } = req.params;
-    const success = await storage.deleteFoodLog(id);
-    if (success) {
-      res.json({ message: "Log de alimento deletado com sucesso." });
-    } else {
-      res.status(404).json({ error: "Log de alimento não encontrado." });
-    }
-  });
-
-  apiRouter.get("/food-logs/range", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.json({});
-    }
-    const user = req.user as AppUser;
-    const start = new Date(req.query.start as string);
-    const end = new Date(req.query.end as string);
-
-    const result: Record<string, any[]> = {};
-    const currentDate = new Date(start);
-
-    while (currentDate <= end) {
-      const dateStr = currentDate.toISOString().split("T")[0];
-      const logs = await storage.getFoodLogs(user.id, currentDate);
       const enrichedLogs = await Promise.all(
         logs.map(async (log: FoodLog) => {
           const food = await storage.getFoodById(log.foodId);
           return { ...log, food };
         })
       );
-      result[dateStr] = enrichedLogs;
-      currentDate.setDate(currentDate.getDate() + 1);
+      res.json(enrichedLogs);
     }
+  );
 
-    res.json(result);
-  });
+  apiRouter.post(
+    "/food-logs",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const { foodId, foodData, portion, meal } = req.body;
 
-  apiRouter.get("/exercises", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.json([]); // Retorna array vazio para convidados
+      let finalFoodId = foodId;
+
+      // Se não houver ID, mas houver dados, cria um novo alimento
+      if (!finalFoodId && foodData) {
+        // Normaliza os dados da IA para uma porção de 100g antes de salvar
+        const multiplier = 100 / (foodData.portion || 100);
+        const normalizedFood = {
+          name: foodData.name,
+          calories: (foodData.calories || 0) * multiplier,
+          protein: (foodData.protein || 0) * multiplier,
+          carbs: (foodData.carbs || 0) * multiplier,
+          fat: (foodData.fat || 0) * multiplier,
+          servingSize: 100,
+          servingUnit: "g",
+        };
+        const newFood = await storage.createFood(normalizedFood);
+        finalFoodId = newFood.id;
+      }
+
+      if (!finalFoodId) {
+        return res
+          .status(400)
+          .json({ error: "foodId or foodData is required" });
+      }
+
+      const log = await storage.createFoodLog({
+        userId: user.id,
+        foodId: finalFoodId,
+        portion,
+        meal,
+      });
+      res.json(log);
     }
-    const user = req.user as AppUser;
-    const date = req.query.date
-      ? new Date(req.query.date as string)
-      : new Date();
-    const exercises = await storage.getExercises(user.id, date);
-    res.json(exercises);
-  });
+  );
 
-  apiRouter.post("/exercises", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Não autorizado" });
+  apiRouter.delete(
+    "/food-logs/:id",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const { id } = req.params;
+      const success = await storage.deleteFoodLog(id);
+      if (success) {
+        res.json({ message: "Log de alimento deletado com sucesso." });
+      } else {
+        res.status(404).json({ error: "Log de alimento não encontrado." });
+      }
     }
-    const user = req.user as AppUser;
-    const exercise = await storage.createExercise({
-      userId: user.id,
-      ...req.body,
-    });
-    res.json(exercise);
-  });
+  );
 
-  apiRouter.get("/exercises/range", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.json({});
+  apiRouter.get(
+    "/food-logs/range",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const start = new Date(req.query.start as string);
+      const end = new Date(req.query.end as string);
+
+      const result: Record<string, any[]> = {};
+      const currentDate = new Date(start);
+
+      while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split("T")[0];
+        const logs = await storage.getFoodLogs(user.id, currentDate);
+        const enrichedLogs = await Promise.all(
+          logs.map(async (log: FoodLog) => {
+            const food = await storage.getFoodById(log.foodId);
+            return { ...log, food };
+          })
+        );
+        result[dateStr] = enrichedLogs;
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      res.json(result);
     }
-    const user = req.user as AppUser;
-    const start = new Date(req.query.start as string);
-    const end = new Date(req.query.end as string);
+  );
 
-    const result: Record<string, any[]> = {};
-    const currentDate = new Date(start);
-
-    while (currentDate <= end) {
-      const dateStr = currentDate.toISOString().split("T")[0];
-      const exercises = await storage.getExercises(user.id, currentDate);
-      result[dateStr] = exercises;
-      currentDate.setDate(currentDate.getDate() + 1);
+  apiRouter.get(
+    "/exercises",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const date = req.query.date
+        ? new Date(req.query.date as string)
+        : new Date();
+      const exercises = await storage.getExercises(user.id, date);
+      res.json(exercises);
     }
+  );
 
-    res.json(result);
-  });
+  apiRouter.post(
+    "/exercises",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const exercise = await storage.createExercise({
+        userId: user.id,
+        ...req.body,
+      });
+      res.json(exercise);
+    }
+  );
+
+  apiRouter.get(
+    "/exercises/range",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const start = new Date(req.query.start as string);
+      const end = new Date(req.query.end as string);
+
+      const result: Record<string, any[]> = {};
+      const currentDate = new Date(start);
+
+      while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split("T")[0];
+        const exercises = await storage.getExercises(user.id, currentDate);
+        result[dateStr] = exercises;
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      res.json(result);
+    }
+  );
+
+  // --- ROTAS DE ALARME ---
+  apiRouter.get(
+    "/alarms",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const alarms = await storage.getAlarms(user.id);
+      res.json(alarms);
+    }
+  );
+
+  apiRouter.post(
+    "/alarms",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const user = req.user as AppUser;
+      const alarmData = { ...req.body, userId: user.id };
+      const newAlarm = await storage.createAlarm(alarmData);
+      res.status(201).json(newAlarm);
+    }
+  );
+
+  apiRouter.put(
+    "/alarms/:id",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const { id } = req.params;
+      const updatedAlarm = await storage.updateAlarm(id, req.body);
+      if (updatedAlarm) {
+        res.json(updatedAlarm);
+      } else {
+        res.status(404).json({ error: "Alarme não encontrado" });
+      }
+    }
+  );
+
+  apiRouter.delete(
+    "/alarms/:id",
+    ensureAuthenticated,
+    async (req: Request, res: Response) => {
+      const { id } = req.params;
+      const success = await storage.deleteAlarm(id);
+      if (success) {
+        res.status(204).send();
+      } else {
+        res.status(404).json({ error: "Alarme não encontrado" });
+      }
+    }
+  );
 
   apiRouter.post("/chat", async (req: Request, res: Response) => {
     let user: AppUser;

@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 export function useUser() {
   const { user } = useAuth();
   return useQuery<User>({
-    queryKey: ["/api/user"],
+    queryKey: ["user"],
     enabled: !user?.isGuest,
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user");
@@ -30,7 +30,7 @@ export function useUpdateUser() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["user"] });
       }
     },
   });
@@ -38,7 +38,11 @@ export function useUpdateUser() {
 
 export function useFoods(query?: string) {
   return useQuery<Food[]>({
-    queryKey: ["/api/foods", query],
+    queryKey: ["foods", query],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/foods?q=${query}`);
+      return res.json();
+    },
     enabled: !!query && query.length > 0,
   });
 }
@@ -59,8 +63,12 @@ export function useFoodLogs(date?: Date) {
     : new Date().toISOString().split("T")[0];
 
   return useQuery<(FoodLog & { food?: Food })[]>({
-    queryKey: ["/api/food-logs", dateStr],
+    queryKey: ["food-logs", "detail", dateStr],
     enabled: !user?.isGuest,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/food-logs?date=${dateStr}`);
+      return res.json();
+    },
   });
 }
 
@@ -83,9 +91,7 @@ export function useCreateFoodLog() {
     },
     onSuccess: (data) => {
       if (data) {
-        // Invalida TODAS as queries que começam com '/api/food-logs'
-        // Isso inclui o resumo diário e o calendário/progresso
-        queryClient.invalidateQueries({ queryKey: ["/api/food-logs"] });
+        queryClient.invalidateQueries({ queryKey: ["food-logs"] });
       }
     },
   });
@@ -105,8 +111,7 @@ export function useDeleteFoodLog() {
     },
     onSuccess: (data) => {
       if (data) {
-        // Invalida TODAS as queries que começam com '/api/food-logs'
-        queryClient.invalidateQueries({ queryKey: ["/api/food-logs"] });
+        queryClient.invalidateQueries({ queryKey: ["food-logs"] });
       }
     },
   });
@@ -119,8 +124,12 @@ export function useExercises(date?: Date) {
     : new Date().toISOString().split("T")[0];
 
   return useQuery<Exercise[]>({
-    queryKey: ["/api/exercises", dateStr],
+    queryKey: ["exercises", "detail", dateStr],
     enabled: !user?.isGuest,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/exercises?date=${dateStr}`);
+      return res.json();
+    },
   });
 }
 
@@ -143,7 +152,7 @@ export function useCreateExercise() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: ["/api/exercises"] });
+        queryClient.invalidateQueries({ queryKey: ["exercises"] });
       }
     },
   });
@@ -155,13 +164,18 @@ interface Alarm {
   time: string;
   label: string;
   enabled: boolean;
+  sound: string;
 }
 
 export function useAlarms() {
   const { user } = useAuth();
   return useQuery<Alarm[]>({
-    queryKey: ["/api/alarms"],
+    queryKey: ["alarms"],
     enabled: !user?.isGuest,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/alarms`);
+      return res.json();
+    },
   });
 }
 
@@ -173,6 +187,7 @@ export function useCreateAlarm() {
       time: string;
       label: string;
       enabled?: boolean;
+      sound: string;
     }) => {
       if (user?.isGuest) {
         toast({ title: "Faça login para salvar seus alarmes." });
@@ -183,7 +198,7 @@ export function useCreateAlarm() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: ["/api/alarms"] });
+        queryClient.invalidateQueries({ queryKey: ["alarms"] });
       }
     },
   });
@@ -203,7 +218,7 @@ export function useUpdateAlarm() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: ["/api/alarms"] });
+        queryClient.invalidateQueries({ queryKey: ["alarms"] });
       }
     },
   });
@@ -223,7 +238,7 @@ export function useDeleteAlarm() {
     },
     onSuccess: (data) => {
       if (data) {
-        queryClient.invalidateQueries({ queryKey: ["/api/alarms"] });
+        queryClient.invalidateQueries({ queryKey: ["alarms"] });
       }
     },
   });
@@ -246,7 +261,7 @@ export function useFoodLogsRange(startDate: Date, endDate: Date) {
   const endStr = endDate.toISOString().split("T")[0];
 
   return useQuery<Record<string, (FoodLog & { food?: Food })[]>>({
-    queryKey: ["/api/food-logs/range", startStr, endStr],
+    queryKey: ["food-logs", "range", startStr, endStr],
     enabled: !user?.isGuest,
     queryFn: async () => {
       const res = await apiRequest(
@@ -264,7 +279,7 @@ export function useExercisesRange(startDate: Date, endDate: Date) {
   const endStr = endDate.toISOString().split("T")[0];
 
   return useQuery<Record<string, Exercise[]>>({
-    queryKey: ["/api/exercises/range", startStr, endStr],
+    queryKey: ["exercises", "range", startStr, endStr],
     enabled: !user?.isGuest,
     queryFn: async () => {
       const res = await apiRequest(

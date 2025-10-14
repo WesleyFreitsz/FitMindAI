@@ -20,6 +20,34 @@ import {
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
+const activityLevels = [
+  {
+    value: "sedentario",
+    label: "Sedentário",
+    description: "Pouco ou nenhum exercício.",
+  },
+  {
+    value: "leve",
+    label: "Levemente Ativo",
+    description: "Exercício leve 1-3 dias/semana.",
+  },
+  {
+    value: "moderado",
+    label: "Moderadamente Ativo",
+    description: "Exercício moderado 3-5 dias/semana.",
+  },
+  {
+    value: "intenso",
+    label: "Muito Ativo",
+    description: "Exercício intenso 6-7 dias/semana.",
+  },
+  {
+    value: "muito_intenso",
+    label: "Extremamente Ativo",
+    description: "Exercício muito intenso e trabalho físico.",
+  },
+];
+
 export default function RegisterPage() {
   const { register } = useAuth();
   const [, navigate] = useLocation();
@@ -29,19 +57,19 @@ export default function RegisterPage() {
     name: "",
     email: "",
     password: "",
-    age: 0,
+    age: "" as number | "",
     sex: "",
-    weight: 0,
-    height: 0,
+    weight: "" as number | "",
+    height: "" as number | "",
     goal: "",
     activityLevel: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
+    const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [id]: type === "number" ? parseFloat(value) || 0 : value,
+      [id]: value,
     }));
   };
 
@@ -54,7 +82,14 @@ export default function RegisterPage() {
     setError("");
     setIsLoading(true);
     try {
-      await register(formData);
+      const submissionData = {
+        ...formData,
+        email: formData.email.toLowerCase(),
+        age: Number(formData.age) || 0,
+        weight: Number(formData.weight) || 0,
+        height: Number(formData.height) || 0,
+      };
+      await register(submissionData);
       navigate("/");
     } catch (err: any) {
       setError(
@@ -129,7 +164,7 @@ export default function RegisterPage() {
                   disabled={isLoading}
                 >
                   <SelectTrigger id="sex">
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="masculino">Masculino</SelectItem>
@@ -171,7 +206,7 @@ export default function RegisterPage() {
                 disabled={isLoading}
               >
                 <SelectTrigger id="goal">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="perder">Perder Gordura</SelectItem>
@@ -188,16 +223,19 @@ export default function RegisterPage() {
                 disabled={isLoading}
               >
                 <SelectTrigger id="activityLevel">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sedentario">Sedentário</SelectItem>
-                  <SelectItem value="leve">Levemente Ativo</SelectItem>
-                  <SelectItem value="moderado">Moderadamente Ativo</SelectItem>
-                  <SelectItem value="intenso">Muito Ativo</SelectItem>
-                  <SelectItem value="muito_intenso">
-                    Extremamente Ativo
-                  </SelectItem>
+                  {activityLevels.map((level) => (
+                    <SelectItem key={level.value} value={level.value}>
+                      <div>
+                        <p className="font-medium">{level.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {level.description}
+                        </p>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

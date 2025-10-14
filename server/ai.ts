@@ -87,7 +87,7 @@ export async function parseUserInput(
       answer: "AI features are disabled. Please configure GEMINI_API_KEY.",
     };
   }
-  
+
   const prompt = `
     Você é um assistente de nutrição e fitness especialista chamado FitMind AI. Sua principal função é analisar a entrada do usuário e categorizá-la em uma de três intenções: 'food' (registro de comida), 'workout' (registro de treino), ou 'question' (pergunta geral).
 
@@ -140,7 +140,7 @@ export async function estimateFoodNutrition(
   if (!model) {
     return null;
   }
-  
+
   const prompt = `
       Você é um especialista em nutrição. Estime os valores nutricionais do alimento solicitado.
       Retorne um JSON com: { "name": "nome do alimento", "calories": número, "protein": número, "carbs": número, "fat": número, "portion": número, "unit": "unidade" }.
@@ -165,8 +165,8 @@ export async function chatWithAI(
   if (!genAI) {
     return "AI features are disabled. Please configure GEMINI_API_KEY.";
   }
-  
-  const chatModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Modelo para chat, sem modo JSON forçado
+
+  const chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Modelo para chat, sem modo JSON forçado
 
   // Converte o histórico de mensagens para o formato do Gemini
   let history = messages.slice(0, -1).map((msg) => ({

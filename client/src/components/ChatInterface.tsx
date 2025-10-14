@@ -16,6 +16,7 @@ import {
 import { useChatWithAI, useParseFoodText, useCreateFoodLog } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { InsertFood } from "@shared/schema";
+import AISuggestionCard from "./AISuggestionCard";
 
 interface Message {
   id: string;
@@ -190,7 +191,7 @@ export default function ChatInterface() {
     createLogMutation.isPending;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full max-h-[920px]">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((message) => (
@@ -291,6 +292,17 @@ export default function ChatInterface() {
             )}
           </Button>
         </div>
+      </div>
+      <div className="flex flex-col gap-4 mt-4">
+        <AISuggestionCard
+          message={'Experimente dizer "corri por 30 minutos"'}
+        />
+        <AISuggestionCard
+          message={'Tente "comi 2 fatias de pão integral e 2 ovos"'}
+        />
+        <AISuggestionCard
+          message={'Pergunte "qual o melhor cardio para queimar gordura?"'}
+        />
       </div>
     </div>
   );

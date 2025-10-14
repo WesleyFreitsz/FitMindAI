@@ -7,6 +7,7 @@ import {
   real,
   timestamp,
   pgEnum,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -70,6 +71,17 @@ export const exercises = pgTable("exercises", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
+export const alarms = pgTable("alarms", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  time: text("time").notNull(),
+  label: text("label").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  sound: text("sound").notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFoodSchema = createInsertSchema(foods).omit({ id: true });
 export const insertFoodLogSchema = createInsertSchema(foodLogs).omit({
@@ -80,6 +92,7 @@ export const insertExerciseSchema = createInsertSchema(exercises).omit({
   id: true,
   timestamp: true,
 });
+export const insertAlarmSchema = createInsertSchema(alarms).omit({ id: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -89,3 +102,5 @@ export type FoodLog = typeof foodLogs.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type InsertFoodLog = z.infer<typeof insertFoodLogSchema>;
 export type InsertExercise = z.infer<typeof insertExerciseSchema>;
+export type Alarm = typeof alarms.$inferSelect;
+export type InsertAlarm = z.infer<typeof insertAlarmSchema>;

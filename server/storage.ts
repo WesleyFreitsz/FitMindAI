@@ -6,23 +6,18 @@ import {
   type InsertFoodLog,
   type Exercise,
   type InsertExercise,
+  type Alarm,
+  type InsertAlarm,
   users,
   foods,
   foodLogs,
   exercises,
+  alarms,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-
-export interface Alarm {
-  id: string;
-  userId: string;
-  time: string;
-  label: string;
-  enabled: boolean;
-}
 
 // Interface para o usuário sem a senha, para ser usado externamente
 export type SafeUser = Omit<User, "password">;
@@ -56,10 +51,10 @@ export interface IStorage {
 
   // Métodos de Alarmes
   getAlarms(userId: string): Promise<Alarm[]>;
-  createAlarm(alarm: Omit<Alarm, "id">): Promise<Alarm>;
+  createAlarm(alarm: InsertAlarm): Promise<Alarm>;
   updateAlarm(
     id: string,
-    data: Partial<Omit<Alarm, "id">>
+    data: Partial<Omit<Alarm, "id" | "userId">>
   ): Promise<Alarm | undefined>;
   deleteAlarm(id: string): Promise<boolean>;
 }
@@ -213,34 +208,33 @@ class DrizzleStorage implements IStorage {
   }
 
   // --- Métodos de Alarmes ---
-  private alarms: Map<string, Alarm> = new Map();
-
   async getAlarms(userId: string): Promise<Alarm[]> {
-    return Array.from(this.alarms.values()).filter(
-      (alarm) => alarm.userId === userId
-    );
+    return this.db.select().from(alarms).where(eq(alarms.userId, userId));
   }
 
-  async createAlarm(alarm: Omit<Alarm, "id">): Promise<Alarm> {
-    const id = randomUUID();
-    const newAlarm: Alarm = { ...alarm, id };
-    this.alarms.set(id, newAlarm);
-    return newAlarm;
+  async createAlarm(alarm: InsertAlarm): Promise<Alarm> {
+    const newAlarm = await this.db.insert(alarms).values(alarm).returning();
+    return newAlarm[0];
   }
 
   async updateAlarm(
     id: string,
-    data: Partial<Omit<Alarm, "id">>
+    data: Partial<Omit<Alarm, "id" | "userId">>
   ): Promise<Alarm | undefined> {
-    const alarm = this.alarms.get(id);
-    if (!alarm) return undefined;
-    const updated = { ...alarm, ...data };
-    this.alarms.set(id, updated);
-    return updated;
+    const updated = await this.db
+      .update(alarms)
+      .set(data)
+      .where(eq(alarms.id, id))
+      .returning();
+    return updated[0];
   }
 
   async deleteAlarm(id: string): Promise<boolean> {
-    return this.alarms.delete(id);
+    const result = await this.db
+      .delete(alarms)
+      .where(eq(alarms.id, id))
+      .returning({ id: alarms.id });
+    return result.length > 0;
   }
 }
 

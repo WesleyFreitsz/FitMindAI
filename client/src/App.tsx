@@ -50,16 +50,17 @@ function MainLayout() {
           <ThemeToggle />
           {user?.isGuest ? (
             <Button
-              variant="ghost"
-              size="icon"
-              title="Entrar"
+              variant="outline"
+              size="sm"
               onClick={() => navigate("/login")}
             >
-              <LogIn className="w-5 h-5" />
+              <span className="mr-2">Login</span>
+              <LogIn className="w-4 h-4" />
             </Button>
           ) : (
-            <Button variant="ghost" size="icon" title="Sair" onClick={logout}>
-              <LogOut className="w-5 h-5" />
+            <Button variant="outline" size="sm" onClick={logout}>
+              <span className="mr-2">Sair</span>
+              <LogOut className="w-4 h-4" />
             </Button>
           )}
         </div>
@@ -100,15 +101,24 @@ function MainLayout() {
   );
 }
 
+function LoadingOverlay({ text }: { text: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+      <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+      <p className="text-lg font-medium text-foreground">{text}</p>
+    </div>
+  );
+}
+
 function AppRoutes() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isLoggingOut } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen w-full bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingOverlay text="Carregando..." />;
+  }
+
+  if (isLoggingOut) {
+    return <LoadingOverlay text="A terminar sessão..." />;
   }
 
   return (
