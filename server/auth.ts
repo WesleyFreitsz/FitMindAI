@@ -1,8 +1,8 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcrypt";
-import { storage } from "./storage";
-import { User } from "@shared/schema";
+import { storage } from "./storage.js";
+import { User } from "../shared/schema.js";
 
 type SafeUser = Omit<User, "password">;
 
@@ -38,7 +38,7 @@ passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await storage.getUserById(id);
     if (user) {
-      done(null, user); 
+      done(null, user);
     } else {
       done(null, false);
     }

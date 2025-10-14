@@ -1,19 +1,19 @@
 import {
-  type User,
-  type InsertUser,
-  type Food,
-  type FoodLog,
-  type InsertFoodLog,
-  type Exercise,
-  type InsertExercise,
-  type Alarm,
-  type InsertAlarm,
-  users,
-  foods,
-  foodLogs,
-  exercises,
+  Alarm,
   alarms,
-} from "@shared/schema";
+  Exercise,
+  exercises,
+  Food,
+  FoodLog,
+  foodLogs,
+  foods,
+  InsertAlarm,
+  InsertExercise,
+  InsertFoodLog,
+  InsertUser,
+  User,
+  users,
+} from "../shared/schema.js";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";

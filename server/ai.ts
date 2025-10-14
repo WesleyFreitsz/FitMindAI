@@ -3,8 +3,7 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
-import { User } from "@shared/schema";
-
+import { User } from "../shared/schema.js";
 // Pega a chave do ambiente que configuramos
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 if (!apiKey) {

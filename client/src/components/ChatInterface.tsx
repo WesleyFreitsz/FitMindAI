@@ -191,7 +191,7 @@ export default function ChatInterface() {
     createLogMutation.isPending;
 
   return (
-    <div className="flex flex-col h-full max-h-[920px]">
+    <div className="flex flex-col h-full max-h-[880px]">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((message) => (

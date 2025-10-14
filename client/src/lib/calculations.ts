@@ -100,8 +100,8 @@ export function calculateDailyStats(
       servingSize: number;
     };
     portion: number;
-  }>,
-  exercises: Array<{ caloriesBurned: number }>
+  }> = [], // Adicionado valor padrão
+  exercises: Array<{ caloriesBurned: number }> = [] // Adicionado valor padrão
 ) {
   const totals = logs.reduce(
     (acc, log) => {

@@ -5,11 +5,11 @@ import express, {
   type NextFunction,
 } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { parseUserInput, chatWithAI, estimateFoodNutrition } from "./ai";
-import passport from "./auth";
+import { storage } from "./storage.js";
+import { parseUserInput, chatWithAI, estimateFoodNutrition } from "./ai.js";
+import passport from "./auth.js";
 import bcrypt from "bcrypt";
-import { User as AppUser, Food, FoodLog } from "@shared/schema";
+import { User as AppUser, Food, FoodLog } from "../shared/schema.js";
 import { z } from "zod";
 
 // Estende a interface global do Express para que o req.user seja tipado corretamente
