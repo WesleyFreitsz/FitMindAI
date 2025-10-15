@@ -39,7 +39,7 @@ const safetySettings = [
 ];
 
 const model = genAI?.getGenerativeModel({
-  model: "gemini-2.0-flash",
+  model: "gemini-2.0-flash-lite",
   generationConfig,
   safetySettings,
 });
@@ -64,7 +64,7 @@ interface ParsedWorkout {
   type: "food" | "workout" | "question";
   workouts?: {
     name: string;
-    duration: number; 
+    duration: number;
     intensity: "leve" | "moderado" | "intenso";
     caloriesBurned: number;
   }[];
@@ -162,7 +162,9 @@ export async function chatWithAI(
     return "AI features are disabled. Please configure GEMINI_API_KEY.";
   }
 
-  const chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
+  const chatModel = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash-lite",
+  });
 
   let history = messages.slice(0, -1).map((msg) => ({
     role: msg.role === "assistant" ? "model" : "user",
